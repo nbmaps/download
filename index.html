@@ -196,11 +196,12 @@
     async function loadSystemList() {
         $('#load-status').textContent = 'Lade Systemliste...';
         try {
-            const url = `${corsProxy}https://api.nextbike.net/maps/gbfs/v2/nextbike_systems.json`;
+            const url = `${corsProxy}https://gbfs.nextbike.net/systems.json`;
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             allSystems = data.data.systems;
+            
             const systemInput = $('#systemInput');
             systemInput.disabled = false;
             systemInput.placeholder = `${allSystems.length} Systeme verfügbar...`;
@@ -208,6 +209,7 @@
         } catch(e) {
             $('#load-status').textContent = 'Fehler beim Laden der Systeme.';
             alert('Die Systemliste konnte nicht geladen werden.');
+            console.error(e);
         }
     }
 
@@ -228,7 +230,7 @@
             
             systemResults.innerHTML = '';
             if (filtered.length > 0) {
-                filtered.slice(0, 100).forEach(system => { // Limit to 100 results for performance
+                filtered.slice(0, 100).forEach(system => {
                     const item = document.createElement('div');
                     item.className = 'autocomplete-item';
                     item.textContent = system.name;
@@ -266,7 +268,7 @@
         flexzoneLayer.clearLayers();
 
         try {
-            const gbfsUrl = `${corsProxy}${selectedSystem.url}`;
+            const gbfsUrl = `${corsProxy}${selectedSystem.url}`; // Korrigiert: .url statt .gbfs_href
             const gbfsResp = await fetch(gbfsUrl);
             if (!gbfsResp.ok) throw new Error(`GBFS für ${selectedSystem.name} nicht gefunden.`);
             const gbfsData = await gbfsResp.json();
@@ -285,19 +287,25 @@
                 requests.push(fetch(`${corsProxy}${stationStatusUrl}`).then(r => r.json()));
             }
 
-            const [infoData, statusData] = await Promise.all(requests);
-            
-            const infoMap = new Map(infoData.data.stations.map(s => [s.station_id, s]));
-            let stationCount = 0;
-            statusData.data.stations.forEach(s => {
-                const i = infoMap.get(s.station_id);
-                if (!i) return;
-                const marker = L.marker([i.lat, i.lon], { icon: stationIcon }).bindPopup(
-                    `<b>${i.name}</b><br>Räder: ${s.num_bikes_available}`
-                );
-                stationMarkers.addLayer(marker);
-                stationCount++;
-            });
+            if (requests.length > 0) {
+                const [infoData, statusData] = await Promise.all(requests);
+                
+                const infoMap = new Map(infoData.data.stations.map(s => [s.station_id, s]));
+                let stationCount = 0;
+                statusData.data.stations.forEach(s => {
+                    const i = infoMap.get(s.station_id);
+                    if (!i) return;
+                    const marker = L.marker([i.lat, i.lon], { icon: stationIcon }).bindPopup(
+                        `<b>${i.name}</b><br>Räder: ${s.num_bikes_available}`
+                    );
+                    stationMarkers.addLayer(marker);
+                    stationCount++;
+                });
+                 $('#load-status').textContent = `${stationCount} Stationen für ${selectedSystem.name} geladen.`;
+            } else {
+                 $('#load-status').textContent = `Keine Stations-Feeds für ${selectedSystem.name} gefunden.`;
+            }
+
 
             if ($('#flexzonesCheckbox').checked && zonesUrl) {
                 const zonesResp = await fetch(`${corsProxy}${zonesUrl}`);
@@ -311,11 +319,10 @@
             if (combinedLayer.getLayers().length > 0) {
                 map.fitBounds(combinedLayer.getBounds(), { padding: [50, 50] });
             }
-            
-            $('#load-status').textContent = `${stationCount} Stationen für ${selectedSystem.name} geladen.`;
 
         } catch (e) {
             $('#load-status').textContent = 'Fehler: ' + e.message;
+            console.error(e);
         } finally {
             loadBtn.disabled = false;
             $('#loadIcon').innerHTML = '';
