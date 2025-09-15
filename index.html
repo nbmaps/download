@@ -323,6 +323,7 @@
 
   <script>
     const $ = sel => document.querySelector(sel);
+    const corsProxy = 'https://corsproxy.io/?';
 
     let map, layer, currentGeoJSON = null;
     let flexzoneLayer;
@@ -358,7 +359,7 @@
 
       map = L.map('map', { layers: [positron] });
       
-      const overlays = {}; // Overlays werden später hinzugefügt
+      const overlays = {};
 
       layer = L.geoJSON(null, {
         pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
@@ -372,10 +373,12 @@
       });
       
       flexzoneLayer = L.geoJSON(null, {
-          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 }
+          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 },
+          onEachFeature: (f, l) => {
+              if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`);
+          }
       });
 
-      // Füge Layer zur Karte und zur Steuerung hinzu
       layer.addTo(map);
       flexzoneLayer.addTo(map);
       overlays["Stationen"] = layer;
@@ -424,7 +427,8 @@
       $('#load-status').style.visibility = 'visible';
       $('#load-status').textContent = 'Systeme werden geladen...';
       try{
-        const resp = await fetch('https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0', { cache: 'no-store' });
+        const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0`;
+        const resp = await fetch(url, { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         if (!data || !data.countries) throw new Error("API-Antwort ist ungültig.");
@@ -460,7 +464,8 @@
 
     async function fetchCitiesForBrand(domain){
       if(brandCitiesCache.has(domain)) return brandCitiesCache.get(domain);
-      const resp = await fetch(`https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`, { cache: 'no-store' });
+      const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
+      const resp = await fetch(url, { cache: 'no-store' });
       if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const out = [];
@@ -519,12 +524,12 @@
       try{
         const domain = selectedBrandDomain, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
-        let url = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
-        if(cityUid) url += `&city=${cityUid}`;
-        else if(domain) url += `&domains=${domain}`;
-        else if(countryCode) url += `&countries=${countryCode}`;
+        let baseUrl = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
+        if(cityUid) baseUrl += `&city=${cityUid}`;
+        else if(domain) baseUrl += `&domains=${domain}`;
+        else if(countryCode) baseUrl += `&countries=${countryCode}`;
 
-        const resp = await fetch(url, { cache: 'no-store' });
+        const resp = await fetch(`${corsProxy}${baseUrl}`, { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         let fc = fcFromNextbike(data);
@@ -549,7 +554,7 @@
         flexzoneLayer.clearLayers();
         if ($('#flexzonesCheckbox').checked && selectedBrandDomain) {
             const systemName = `nextbike_${selectedBrandDomain}`;
-            const gbfsUrl = `https://gbfs.nextbike.net/maps/gbfs/v2/${systemName}/gbfs.json`;
+            const gbfsUrl = `${corsProxy}https://gbfs.nextbike.net/maps/gbfs/v2/${systemName}/gbfs.json`;
 
             const gbfsResp = await fetch(gbfsUrl);
             if (gbfsResp.ok) {
@@ -557,13 +562,13 @@
                 const zonesUrl = gbfsData.data.de.feeds.find(f => f.name === 'geofencing_zones')?.url;
 
                 if (zonesUrl) {
-                    const zonesResp = await fetch(zonesUrl);
+                    const zonesResp = await fetch(`${corsProxy}${zonesUrl}`);
                     if (zonesResp.ok) {
                         const zonesData = await zonesResp.json();
                         flexzoneLayer.addData(zonesData);
-                    }
+                    } else { console.error(`GBFS zones fetch failed: ${zonesResp.status}`); }
                 }
-            }
+            } else { console.error(`GBFS main fetch failed: ${gbfsResp.status}`); }
         }
         
         const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
