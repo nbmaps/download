@@ -306,12 +306,16 @@
     let selectedBrandDomain = null;
     const brandCitiesCache = new Map();
 
-    // -- NEU: Definition des benutzerdefinierten Markers --
     const nextbikeIcon = L.icon({
         iconUrl: 'marker_nbblue.png',
-        iconSize:     [28, 41], // Größe des Icons
-        iconAnchor:   [14, 41], // Punkt des Icons, der auf der Kartenkoordinate liegt (Spitze unten mittig)
-        popupAnchor:  [0, -41]  // Punkt, von dem aus sich das Popup öffnet (Spitze oben mittig)
+        // --- ANPASSUNG DER MARKER-GRÖSSE ---
+        // Ändere diese Werte, um die Größe des Markers an deine Bilddatei anzupassen.
+        iconSize:     [35, 35], // [Breite, Höhe] in Pixel
+        // Der "Anker" ist der Punkt des Icons, der auf der exakten Koordinate sitzt.
+        // Für eine Stecknadel ist das die untere Spitze, für ein Quadrat die Mitte unten.
+        iconAnchor:   [17, 35], // [Hälfte der Breite, volle Höhe]
+        // Von wo aus das Popup relativ zum Anker erscheinen soll.
+        popupAnchor:  [0, -35]  // [0, negative Höhe]
     });
 
     function initMap(){
@@ -336,12 +340,15 @@
           "Satellit (Esri)": satellite
       };
 
-      map = L.map('map', { layers: [osm] });
+      // --- GEÄNDERT: "positron" ist jetzt die Standard-Ebene ---
+      map = L.map('map', {
+          layers: [positron]
+      });
+      
       L.control.layers(baseMaps).addTo(map);
 
       map.setView([51.1657, 10.4515], 6);
       
-      // -- GEÄNDERT: GeoJSON-Layer verwendet jetzt das benutzerdefinierte Icon --
       layer = L.geoJSON(null, {
         pointToLayer: function (feature, latlng) {
             return L.marker(latlng, {icon: nextbikeIcon});
