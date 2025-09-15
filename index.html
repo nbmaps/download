@@ -17,7 +17,6 @@
         --text-dark: #212529;
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
-        --code-bg: #212529;
         --left-panel-width: 380px;
         --right-panel-width: 380px;
         --toggle-btn-width: 24px;
@@ -65,7 +64,7 @@
     #right-panel { border-radius: 0 12px 12px 0; }
 
     .panel-content {
-        padding: 0 20px 20px 20px;
+        padding: 20px;
         overflow-y: auto;
         flex-grow: 1;
         visibility: visible;
@@ -116,8 +115,8 @@
         font-size: 12px;
         white-space: pre;
         resize: none;
-        background-color: var(--code-bg);
-        color: var(--text-light);
+        background-color: var(--text-light); /* Geändert */
+        color: var(--text-dark); /* Geändert */
         padding: 12px;
     }
     
@@ -180,7 +179,6 @@
         visibility: hidden;
     }
     
-    /* NEUE STYLES FÜR DAS SUCHFELD */
     .autocomplete-container {
         position: relative;
     }
@@ -196,7 +194,7 @@
         max-height: 250px;
         overflow-y: auto;
         z-index: 1001;
-        display: none; /* Standardmäßig versteckt */
+        display: none;
     }
     .autocomplete-item {
         padding: 8px 12px;
@@ -213,7 +211,6 @@
     .autocomplete-item:hover small, .autocomplete-item.active small {
         color: var(--text-light);
     }
-    /* ENDE NEUE STYLES */
 
     .spinner {
         border: 2px solid rgba(255,255,255,0.3);
@@ -234,8 +231,7 @@
   <div class="wrap" id="main-wrap">
     <section class="panel" id="left-panel">
       <div class="panel-content">
-        <h3 style="margin-top:0; font-size: 1.5rem;">Steuerung</h3>
-        <label for="countrySelect">1) Land wählen</label>
+        <label for="countrySelect">1) Land wählen (optional)</label>
         <select id="countrySelect"></select>
 
         <label for="brandInput">2) Marke/System suchen</label>
@@ -243,6 +239,7 @@
             <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
             <div class="autocomplete-results" id="brandResults"></div>
         </div>
+
         <label for="citySelect">3) Stadt filtern (optional)</label>
         <select id="citySelect" disabled></select>
 
@@ -280,10 +277,9 @@
 
     <section class="panel" id="right-panel">
         <div class="panel-content" style="display: flex; flex-direction: column; padding-top: 20px;">
-            <label for="geojson-output" style="margin-top:0;">GeoJSON der angezeigten Stationen</label>
             <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
             <div class="row">
-                <button class="primary" id="geojsonBtn" disabled>GeoJSON Datei herunterladen</button>
+                <button class="primary" id="geojsonBtn" disabled>GeoJSON download</button>
             </div>
         </div>
     </section>
@@ -469,6 +465,7 @@
         const timestamp = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
         const statusDiv = $('#load-status');
         statusDiv.innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
+        statusDiv.style.visibility = 'visible';
 
         $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
@@ -518,8 +515,10 @@
 
         brandInput.addEventListener('input', () => {
             const query = brandInput.value.toLowerCase();
-            selectedBrandDomain = null; // Auswahl zurücksetzen
-            refreshCitySelect();
+            if (selectedBrandDomain) {
+                selectedBrandDomain = null;
+                refreshCitySelect();
+            }
 
             if (!query) {
                 brandResults.style.display = 'none';
@@ -558,7 +557,8 @@
         });
 
         document.addEventListener('click', (e) => {
-            if (!brandInput.contains(e.target)) {
+            const container = $('.autocomplete-container');
+            if (!container.contains(e.target)) {
                 brandResults.style.display = 'none';
             }
         });
