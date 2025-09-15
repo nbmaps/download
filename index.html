@@ -18,6 +18,8 @@
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
         --code-bg: #212529;
+        --left-panel-width: 420px;
+        --right-panel-width: 420px;
     }
 
     * { box-sizing: border-box; }
@@ -44,29 +46,78 @@
 
     h1 {
         font-size: 22px;
-        color: var(--text-light);
         margin: 0;
         font-weight: 700;
     }
     
     .wrap {
         display: grid;
-        grid-template-columns: 420px 1fr 420px; /* Dreispaltiges Layout */
+        grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
         gap: 20px;
         padding: 20px;
         flex-grow: 1;
         overflow: hidden;
+        transition: grid-template-columns 0.35s ease-in-out;
     }
+
+    .wrap.left-collapsed { --left-panel-width: 0px; }
+    .wrap.right-collapsed { --right-panel-width: 0px; }
 
     .panel {
         background: var(--text-light);
         border: 1px solid var(--border-gray);
         border-radius: 12px;
-        padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        overflow-y: auto;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
+        transition: padding 0.35s ease-in-out, border 0.35s ease-in-out;
+    }
+
+    .wrap.left-collapsed #left-panel,
+    .wrap.right-collapsed #right-panel {
+        padding: 0;
+        border: 0;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        padding-bottom: 0;
+        flex-shrink: 0;
+    }
+    .panel-content {
+        padding: 20px;
+        padding-top: 0;
+        overflow-y: auto;
+        flex-grow: 1;
+        visibility: visible;
+        opacity: 1;
+        transition: visibility 0s, opacity 0.2s linear;
+    }
+
+    .wrap.left-collapsed #left-panel .panel-content,
+    .wrap.right-collapsed #right-panel .panel-content {
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s 0.2s, opacity 0.2s linear;
+    }
+    
+    .panel-toggle-btn {
+        background: transparent;
+        border: 1px solid var(--border-gray);
+        color: var(--text-muted);
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-size: 16px;
     }
     
     #map-container {
@@ -76,16 +127,10 @@
     }
 
     #map { height: 100%; width: 100%; }
-
-    #geojson-viewer {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-    }
     
     #geojson-output {
         width: 100%;
-        flex-grow: 1;
+        height: 100%;
         border-radius: 8px;
         border: 1px solid var(--border-gray);
         font-family: monospace;
@@ -97,12 +142,13 @@
         color: var(--text-light);
         padding: 12px;
     }
-
+    
     label {
         display: block;
         font-size: 14px;
         color: var(--text-muted);
-        margin: 16px 0 6px;
+        margin-top: 16px;
+        margin-bottom: 6px;
         font-weight: 600;
     }
 
@@ -134,22 +180,12 @@
         border: none;
     }
     
-    button.primary:hover {
-        background-color: #007fdb;
-    }
-    
     .row {
         display: flex;
         gap: 12px;
         align-items: center;
         flex-wrap: wrap;
         margin-top: 20px;
-    }
-
-    .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
     }
 
     .spinner {
@@ -172,42 +208,53 @@
     <h1>Nextbike Stationskarte &amp; GeoJSON Viewer</h1>
   </header>
 
-  <div class="wrap">
-    <section class="panel">
-      <label for="countrySelect">1) Land wählen</label>
-      <select id="countrySelect"></select>
-
-      <label for="brandSelect">2) Marke/System wählen</label>
-      <select id="brandSelect" disabled></select>
-
-      <label for="citySelect">3) Stadt filtern (optional)</label>
-      <select id="citySelect" disabled></select>
-
-      <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
-
-      <label for="quickFilter">Schnellfilter</label>
-      <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
-      
-      <div class="row">
-        <button class="primary" id="loadBtn"><span id="loadIcon"></span>🔄 Stationen laden</button>
+  <div class="wrap" id="main-wrap">
+    <section class="panel" id="left-panel">
+      <div class="panel-header">
+        <h3 style="margin:0; font-size: 18px;">Steuerung</h3>
+        <button id="toggle-left-panel" class="panel-toggle-btn" title="Seitenleiste einklappen">◀</button>
       </div>
+      <div class="panel-content">
+        <label for="countrySelect">1) Land wählen</label>
+        <select id="countrySelect"></select>
 
-      <div class="status-bar" id="status" style="margin-top:12px; font-size: 14px;">Lade Listen…</div>
+        <label for="brandSelect">2) Marke/System wählen</label>
+        <select id="brandSelect" disabled></select>
+
+        <label for="citySelect">3) Stadt filtern (optional)</label>
+        <select id="citySelect" disabled></select>
+
+        <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
+
+        <label for="quickFilter">Schnellfilter</label>
+        <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+        
+        <div class="row">
+          <button class="primary" id="loadBtn"><span id="loadIcon"></span>🔄 Stationen laden</button>
+        </div>
+
+        <div class="status-bar" id="status" style="margin-top:12px; font-size: 14px;">Lade Listen…</div>
+      </div>
     </section>
 
     <section id="map-container">
       <div id="map"></div>
     </section>
 
-    <section class="panel" id="geojson-viewer">
-        <label for="geojson-output">GeoJSON der angezeigten Stationen</label>
-        <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code nach dem Laden der Stationen..."></textarea>
-        <div class="row">
-            <button class="primary" id="geojsonBtn" disabled>⬇️ GeoJSON Datei herunterladen</button>
+    <section class="panel" id="right-panel">
+        <div class="panel-header">
+            <h3 style="margin:0; font-size: 18px;">GeoJSON</h3>
+            <button id="toggle-right-panel" class="panel-toggle-btn" title="Seitenleiste einklappen">▶</button>
         </div>
-         <div class="grid" style="margin-top: auto; padding-top:20px;">
-            <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Stationen: <strong id="countStations">–</strong></div>
-            <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Zuletzt geladen: <strong id="lastUpdated">–</strong></div>
+        <div class="panel-content" style="display: flex; flex-direction: column;">
+            <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
+            <div class="row">
+                <button class="primary" id="geojsonBtn" disabled>⬇️ GeoJSON Datei herunterladen</button>
+            </div>
+            <div style="margin-top: auto; padding-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Stationen: <strong id="countStations">–</strong></div>
+                <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Geladen: <strong id="lastUpdated">–</strong></div>
+            </div>
         </div>
     </section>
   </div>
@@ -395,7 +442,7 @@
         currentGeoJSON = fc;
         $('#countStations').textContent = fc.features.length;
         $('#lastUpdated').textContent = new Date().toLocaleString('de-DE');
-        $('#geojson-output').value = JSON.stringify(fc, null, 2); // GeoJSON im Textfeld anzeigen
+        $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
         if(fc.features.length > 0){ 
             const bounds = L.geoJSON(fc).getBounds(); 
@@ -420,9 +467,30 @@
       saveAs(blob, name + '.geojson'); 
     }
     
+    // --- NEU: Logik zum Ein- und Ausklappen der Seitenleisten ---
+    function setupSidebars() {
+        const wrap = $('#main-wrap');
+        const toggleLeftBtn = $('#toggle-left-panel');
+        const toggleRightBtn = $('#toggle-right-panel');
+
+        toggleLeftBtn.addEventListener('click', () => {
+            wrap.classList.toggle('left-collapsed');
+            toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
+            // Sage der Karte, dass sie ihre Größe neu berechnen soll, nachdem die Animation abgeschlossen ist.
+            setTimeout(() => map.invalidateSize(), 350); 
+        });
+
+        toggleRightBtn.addEventListener('click', () => {
+            wrap.classList.toggle('right-collapsed');
+            toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
+            setTimeout(() => map.invalidateSize(), 350);
+        });
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
       loadLists();
+      setupSidebars(); // Neue Funktion aufrufen
       $('#countrySelect').addEventListener('change', refreshBrandSelect);
       $('#brandSelect').addEventListener('change', refreshCitySelect);
       $('#loadBtn').addEventListener('click', loadData);
