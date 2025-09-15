@@ -545,38 +545,39 @@
                 console.error(`Flexzone HTTP ${flexzoneResp.status}`);
             } else {
               const flexzoneData = await flexzoneResp.json();
-              const cityIds = new Set(fc.features.map(f => f.properties.city_uid));
+              const cityNames = new Set(fc.features.map(f => f.properties.city_name));
               
-              // KORRIGIERTE LOGIK: Iteriere durch die verschachtelte Struktur
               const relevantFlexzones = [];
               if (flexzoneData.countries) {
                 flexzoneData.countries.forEach(country => {
                     country.cities.forEach(city => {
-                        if (cityIds.has(city.uid) && city.flexzones) {
+                        if (cityNames.has(city.name) && city.flexzones) {
                             relevantFlexzones.push(...city.flexzones);
                         }
                     });
                 });
               }
               
-              const flexzoneGeoJSON = {
-                  type: "FeatureCollection",
-                  features: relevantFlexzones.map(zone => ({
-                      type: "Feature",
-                      properties: { name: zone.name },
-                      geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
-                  }))
-              };
-              flexzoneLayer.addData(flexzoneGeoJSON);
+              if (relevantFlexzones.length > 0) {
+                  const flexzoneGeoJSON = {
+                      type: "FeatureCollection",
+                      features: relevantFlexzones.map(zone => ({
+                          type: "Feature",
+                          properties: { name: zone.name },
+                          geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
+                      }))
+                  };
+                  flexzoneLayer.addData(flexzoneGeoJSON);
+              }
             }
         }
         
-        if(fc.features.length > 0 || flexzoneLayer.getLayers().length > 0){ 
-            const bounds = fc.features.length > 0 ? layer.getBounds() : flexzoneLayer.getBounds();
-            if(fc.features.length > 0 && flexzoneLayer.getLayers().length > 0) {
-              bounds.extend(flexzoneLayer.getBounds());
+        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
+        if (combinedLayer.getLayers().length > 0) {
+            const bounds = combinedLayer.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, {padding: [50, 50]});
             }
-            if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
         }
 
       }catch(e){ 
