@@ -3,92 +3,260 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nextbike → GeoJSON</title>
+  <title>Nextbike Stationskarte &amp; Export</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
   <style>
-    :root{--bg:#0f172a;--panel:#111827;--muted:#9ca3af;--fg:#e5e7eb;--accent:#22c55e}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--fg)}
-    header{padding:16px 20px;border-bottom:1px solid #1f2937}
-    h1{font-size:18px;margin:0}
-    .wrap{display:grid;grid-template-columns:480px 1fr;gap:12px;padding:12px}
-    .panel{background:var(--panel);border:1px solid #1f2937;border-radius:14px;padding:14px}
-    label{display:block;font-size:12px;color:var(--muted);margin:6px 0 6px}
-    select, input[type="text"], button{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e5e7eb}
-    button{appearance:none;border:0;border-radius:10px;padding:10px 12px;font-weight:600;cursor:pointer}
-    .primary{background:var(--accent);color:#052e16}
-    .ghost{background:#1f2937;color:#e5e7eb;border:1px solid #374151}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .hint{font-size:12px;color:var(--muted)}
-    #map{height:75vh;border-radius:14px}
-    .badge{display:inline-flex;align-items:center;gap:6px;background:#0b1220;border:1px solid #374151;color:#cbd5e1;padding:6px 8px;border-radius:999px;font-size:12px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .spinner{border:3px solid #1f2937;border-top:3px solid var(--accent);border-radius:50%;width:18px;height:18px;animation:spin 1s linear infinite}
+    /* Import der empfohlenen Schriftart von Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    /* Definition der Farbpalette basierend auf der Nextbike CI */
+    :root {
+        --nextbike-dark-blue: #003A5D;
+        --nextbike-light-blue: #0098FF;
+        --background-gray: #F5F7FA;
+        --border-gray: #DEE2E6;
+        --text-dark: #212529;
+        --text-muted: #6C757D;
+        --text-light: #FFFFFF;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
+        background-color: var(--background-gray);
+        color: var(--text-dark);
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    header {
+        background-color: var(--nextbike-dark-blue);
+        color: var(--text-light);
+        padding: 16px 24px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 1000;
+    }
+
+    h1 {
+        font-size: 22px;
+        color: var(--text-light);
+        margin: 0;
+        font-weight: 700;
+    }
+    
+    .wrap {
+        display: grid;
+        grid-template-columns: 480px 1fr;
+        gap: 20px;
+        padding: 20px;
+        flex-grow: 1;
+    }
+
+    .panel {
+        background: var(--text-light);
+        border: 1px solid var(--border-gray);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        overflow-y: auto;
+    }
+    
+    #map-container {
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        overflow: hidden; /* Stellt sicher, dass die Karte innerhalb der abgerundeten Ecken bleibt */
+    }
+
+    #map {
+        height: 100%;
+        width: 100%;
+    }
+
+    label {
+        display: block;
+        font-size: 14px;
+        color: var(--text-muted);
+        margin: 16px 0 6px;
+        font-weight: 600;
+    }
+
+    select, input[type="text"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-gray);
+        background: #fff;
+        color: var(--text-dark);
+        font-size: 16px;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    input[type="text"]::placeholder {
+        color: #adb5bd;
+    }
+
+    button {
+        appearance: none;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        font-size: 16px;
+        transition: all 0.2s ease-in-out;
+    }
+
+    button.primary {
+        background-color: var(--nextbike-light-blue);
+        color: var(--text-light);
+        border: none;
+    }
+    
+    button.primary:hover {
+        background-color: #007fdb; /* Etwas dunkler beim Hover */
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 152, 255, 0.2);
+    }
+    
+    button.ghost {
+        background-color: transparent;
+        color: var(--nextbike-light-blue);
+        border: 2px solid var(--nextbike-light-blue);
+    }
+
+    button.ghost:hover {
+        background-color: var(--nextbike-light-blue);
+        color: var(--text-light);
+    }
+    
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 20px;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .hint {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+    
+    .status-bar {
+        margin-top: 12px;
+        font-size: 14px;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--background-gray);
+        border: 1px solid var(--border-gray);
+        color: var(--text-dark);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    
+    hr {
+        border: none;
+        border-top: 1px solid var(--border-gray);
+        margin: 20px 0;
+    }
+    
+    .spinner {
+        border: 3px solid rgba(0,0,0,0.1);
+        border-top: 3px solid var(--text-light);
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
+    }
+
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
-    footer{padding:10px 16px;font-size:12px;color:#94a3b8;border-top:1px solid #1f2937;text-align:center}
-    a{color:#93c5fd}
-    details{margin-top:10px}
-    summary{cursor:pointer}
-    code{background:#0b1220;padding:2px 4px;border-radius:4px;border:1px solid #374151}
+    
+    footer {
+        text-align: center;
+        padding: 20px;
+        font-size: 14px;
+        color: var(--text-muted);
+        background-color: var(--text-light);
+        border-top: 1px solid var(--border-gray);
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Nextbike → GeoJSON</h1>
-    <div class="hint">1) <strong>Land</strong> wählen, 2) <strong>Marke/System</strong>, 3) optional <strong>Stadt</strong> innerhalb der Marke.</div>
+    <h1>Nextbike Stationskarte &amp; Export</h1>
   </header>
 
   <div class="wrap">
-    <section class="panel" style="height:75vh;overflow:auto">
-      <label for="countrySelect">1) Land (country_name)</label>
+    <section class="panel">
+      <label for="countrySelect">1) Land wählen</label>
       <select id="countrySelect"></select>
 
-      <label for="brandSelect" style="margin-top:10px">2) Marke/System (name)</label>
+      <label for="brandSelect">2) Marke/System wählen</label>
       <select id="brandSelect" disabled></select>
 
-      <label for="citySelect" style="margin-top:10px">3) Stadt innerhalb der Marke</label>
+      <label for="citySelect">3) Stadt filtern (optional)</label>
       <select id="citySelect" disabled></select>
 
-      <div class="grid" style="margin-top:8px">
+      <hr>
+
+      <div class="grid">
         <div>
-          <label for="fileBase">Dateiname (ohne Endung)</label>
+          <label for="fileBase">Dateiname</label>
           <input id="fileBase" type="text" value="nextbike_stations" />
         </div>
         <div>
-          <label for="quickFilter">Schnellfilter (optional)</label>
-          <input id="quickFilter" type="text" placeholder="z. B. \"Bahnhof\"" />
+          <label for="quickFilter">Schnellfilter</label>
+          <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
         </div>
       </div>
-
-      <div style="margin:12px 0" class="row">
-        <button class="primary" id="loadBtn"><span id="loadIcon">🔄</span> Laden</button>
+      
+      <div class="row">
+        <button class="primary" id="loadBtn"><span id="loadIcon"></span>🔄 Stationen laden</button>
         <button class="ghost" id="geojsonBtn" disabled>⬇️ GeoJSON</button>
       </div>
-      <div class="hint" id="status">Lade Listen…</div>
 
-      <hr style="border-color:#1f2937;margin:14px 0">
+      <div class="status-bar" id="status">Lade Listen…</div>
+
+      <hr>
 
       <div class="grid">
         <div class="badge">Stationen: <strong id="countStations">–</strong></div>
-        <div class="badge">Zuletzt geladen: <span id="lastUpdated">–</span></div>
+        <div class="badge">Zuletzt geladen: <strong id="lastUpdated">–</strong></div>
       </div>
-
-      <details>
-        <summary>Export‑Schema</summary>
-        <ul class="hint">
-          <li>Geometrie: <code>Point</code> (WGS84 / EPSG:4326)</li>
-          <li>Eigenschaften: <code>station_id</code>, <code>name</code>, <code>address</code>, <code>capacity</code>, <code>num_bikes_available</code>, <code>num_docks_available</code>, <code>city_uid</code>, <code>city_name</code>, <code>domain</code>, <code>country_name</code></li>
-        </ul>
-      </details>
     </section>
 
-    <section class="panel">
+    <section id="map-container">
       <div id="map"></div>
     </section>
   </div>
 
   <footer>
-    Funktioniert komplett im Browser mit dem offiziellen Nextbike‑Maps‑Endpunkt.
+    Ein Projekt zur Visualisierung und zum Export von Nextbike-Stationsdaten.
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -106,13 +274,14 @@
 
     function initMap(){
       map = L.map('map');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
-      map.setView([51.1657,10.4515], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'&copy; OpenStreetMap' }).addTo(map);
+      map.setView([51.1657, 10.4515], 6); // Angepasster Zoom für Deutschland-Fokus
       layer = L.geoJSON(null, {
         onEachFeature: (f, l) => {
           const p = f.properties || {};
           l.bindPopup(`<strong>${p.name||'Station'}</strong><br>`+
-                      `Bikes: ${p.num_bikes_available ?? '–'} · Docks: ${p.num_docks_available ?? '–'}<br>`+
+                      `Fahrräder: ${p.num_bikes_available ?? '–'}<br>`+
+                      `Freie Plätze: ${p.num_docks_available ?? '–'}<br>`+
                       `ID: ${p.station_id}`);
         }
       }).addTo(map);
@@ -179,7 +348,7 @@
     }
 
     async function loadLists(){
-      status('Lade Listen…');
+      status('Systeme werden geladen...');
       try{
         const url = 'https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0';
         const resp = await fetch(url, { cache: 'no-store' });
@@ -198,10 +367,10 @@
         cSel.value = '';
 
         refreshBrandSelect();
-        status('Listen geladen. Auswahl treffen und „Laden” klicken.');
+        status('Bitte Auswahl treffen und Stationen laden.');
       }catch(e){
         console.error(e);
-        const errorMsg = 'Fehler beim Laden der Listen: ' + e.message;
+        const errorMsg = 'Fehler beim Laden der System-Listen: ' + e.message;
         status(errorMsg);
         alert(errorMsg + '\n\nBitte Internetverbindung prüfen und Seite neu laden.');
       }
@@ -260,7 +429,6 @@
     function fcFromNextbike(json){
       const features = [];
       for(const country of (json.countries||[])){
-        const country_name = country.country_name || country.name || '';
         for(const city of (country.cities||[])){
           const domain = city.domain || '';
           for(const place of (city.places||[])){
@@ -286,13 +454,18 @@
     }
     
     async function loadData(){
-      const countryCode = ($('#countrySelect').value || '').toUpperCase();
-      const domain = $('#brandSelect').value;
-      const cityUid = $('#citySelect').value;
-      $('#loadBtn').disabled = true; $('#loadIcon').innerHTML = '<span class="spinner"></span>';
+      const loadBtn = $('#loadBtn');
+      const loadIcon = $('#loadIcon');
+      loadBtn.disabled = true;
+      loadIcon.innerHTML = '<span class="spinner"></span>';
       status('Lade Stationen…');
+      
       try{
+        const countryCode = ($('#countrySelect').value || '').toUpperCase();
+        const domain = $('#brandSelect').value;
+        const cityUid = $('#citySelect').value;
         let url;
+
         if(domain){
             if(cityUid){
                 url = `https://maps.nextbike.net/maps/nextbike-official.json?city=${encodeURIComponent(cityUid)}&bikes=0`;
@@ -320,17 +493,23 @@
 
         currentGeoJSON = fc;
         $('#countStations').textContent = fc.features.length;
-        $('#lastUpdated').textContent = new Date().toLocaleString();
+        $('#lastUpdated').textContent = new Date().toLocaleString('de-DE');
         layer.clearLayers().addData(fc);
-        if(fc.features.length){ const bounds = L.geoJSON(fc).getBounds(); if(bounds.isValid()) map.fitBounds(bounds.pad(0.1)); }
+        if(fc.features.length > 0){ 
+            const bounds = L.geoJSON(fc).getBounds(); 
+            if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
+        }
         $('#geojsonBtn').disabled = fc.features.length === 0;
-        status('Fertig geladen.');
+        status(`Fertig. ${fc.features.length} Stationen geladen.`);
       }catch(e){ 
           console.error(e); 
           status('Fehler: '+e.message); 
           $('#geojsonBtn').disabled = true; 
       }
-      finally{ $('#loadBtn').disabled = false; $('#loadIcon').textContent = '🔄'; }
+      finally{ 
+          loadBtn.disabled = false; 
+          loadIcon.innerHTML = '';
+      }
     }
 
     function downloadGeoJSON(){ 
