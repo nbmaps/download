@@ -545,13 +545,15 @@
                 console.error(`Flexzone HTTP ${flexzoneResp.status}`);
             } else {
               const flexzoneData = await flexzoneResp.json();
-              const cityNames = new Set(fc.features.map(f => f.properties.city_name));
+              
+              // KORRIGIERTE LOGIK: Abgleich über 'domain' statt 'city.name' oder 'city.uid'
+              const loadedDomains = new Set(fc.features.map(f => f.properties.domain));
               
               const relevantFlexzones = [];
               if (flexzoneData.countries) {
                 flexzoneData.countries.forEach(country => {
                     country.cities.forEach(city => {
-                        if (cityNames.has(city.name) && city.flexzones) {
+                        if (loadedDomains.has(city.domain) && city.flexzones) {
                             relevantFlexzones.push(...city.flexzones);
                         }
                     });
