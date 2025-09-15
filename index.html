@@ -357,10 +357,9 @@
       };
 
       map = L.map('map', { layers: [positron] });
-      L.control.layers(baseMaps).addTo(map);
-
-      map.setView([51.1657, 10.4515], 6);
       
+      const overlays = {}; // Overlays werden später hinzugefügt
+
       layer = L.geoJSON(null, {
         pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
         onEachFeature: (f, l) => {
@@ -370,11 +369,20 @@
                       `Freie Plätze: ${p.num_docks_available ?? '–'}<br>`+
                       `ID: ${p.station_id}`);
         }
-      }).addTo(map);
-
+      });
+      
       flexzoneLayer = L.geoJSON(null, {
           style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 }
-      }).addTo(map);
+      });
+
+      // Füge Layer zur Karte und zur Steuerung hinzu
+      layer.addTo(map);
+      flexzoneLayer.addTo(map);
+      overlays["Stationen"] = layer;
+      overlays["Flexzonen"] = flexzoneLayer;
+      
+      L.control.layers(baseMaps, overlays).addTo(map);
+      map.setView([51.1657, 10.4515], 6);
     }
 
     function option(value, label){ const o = document.createElement('option'); o.value = value; o.textContent = label; return o; }
@@ -538,9 +546,25 @@
         
         $('#geojsonBtn').disabled = fc.features.length === 0;
 
-        // Die Logik zum Laden der Flexzonen wird für den Test ignoriert
         flexzoneLayer.clearLayers();
-        // if ($('#flexzonesCheckbox').checked) { ... }
+        if ($('#flexzonesCheckbox').checked && selectedBrandDomain) {
+            const systemName = `nextbike_${selectedBrandDomain}`;
+            const gbfsUrl = `https://gbfs.nextbike.net/maps/gbfs/v2/${systemName}/gbfs.json`;
+
+            const gbfsResp = await fetch(gbfsUrl);
+            if (gbfsResp.ok) {
+                const gbfsData = await gbfsResp.json();
+                const zonesUrl = gbfsData.data.de.feeds.find(f => f.name === 'geofencing_zones')?.url;
+
+                if (zonesUrl) {
+                    const zonesResp = await fetch(zonesUrl);
+                    if (zonesResp.ok) {
+                        const zonesData = await zonesResp.json();
+                        flexzoneLayer.addData(zonesData);
+                    }
+                }
+            }
+        }
         
         const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
         if (combinedLayer.getLayers().length > 0) {
@@ -559,51 +583,6 @@
           $('#loadIcon').innerHTML = '';
       }
     }
-
-    // --- NEUE DEBUG-FUNKTION ---
-    async function loadLeipzigFlexzoneForDebug() {
-        try {
-            console.log("DEBUG: Starte Ladevorgang für Leipziger Flexzone...");
-            const flexzoneResp = await fetch('https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c');
-            if (!flexzoneResp.ok) {
-                throw new Error(`Flexzone HTTP ${flexzoneResp.status}`);
-            }
-            const flexzoneData = await flexzoneResp.json();
-            
-            let leipzigCity = null;
-            if (flexzoneData.countries) {
-                for (const country of flexzoneData.countries) {
-                    const foundCity = country.cities.find(city => city.name === 'Leipzig');
-                    if (foundCity) {
-                        leipzigCity = foundCity;
-                        break;
-                    }
-                }
-            }
-
-            if (leipzigCity && leipzigCity.flexzones) {
-                console.log("DEBUG: Leipziger Flexzonen gefunden:", leipzigCity.flexzones);
-                const flexzoneGeoJSON = {
-                    type: "FeatureCollection",
-                    features: leipzigCity.flexzones.map(zone => ({
-                        type: "Feature",
-                        properties: { name: zone.name },
-                        geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
-                    }))
-                };
-                flexzoneLayer.clearLayers().addData(flexzoneGeoJSON);
-                map.fitBounds(flexzoneLayer.getBounds(), {padding: [50, 50]});
-                console.log("DEBUG: Leipziger Flexzonen zur Karte hinzugefügt.");
-            } else {
-                console.error("DEBUG: Keine Flexzonen für Leipzig in der API-Antwort gefunden.");
-                alert("Konnte keine Flexzonen für Leipzig finden.");
-            }
-        } catch(e) {
-            console.error("DEBUG: Kritischer Fehler beim Laden der Flexzone:", e);
-            alert("Ein Fehler ist beim Laden der Flexzone aufgetreten. Details in der Konsole.");
-        }
-    }
-
 
     function downloadGeoJSON(){ 
       if(!currentGeoJSON) return; 
@@ -687,7 +666,6 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
-      loadLeipzigFlexzoneForDebug(); // Temporärer Testaufruf
       loadLists();
       setupSidebars();
       setupBrandSearch();
