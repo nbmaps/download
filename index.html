@@ -234,24 +234,6 @@
         margin-right: 6px;
     }
     
-    .checkbox-container {
-        display: flex;
-        align-items: center;
-        margin-top: 1rem;
-        padding: 8px;
-        background-color: var(--background-gray);
-    }
-    .checkbox-container input {
-        width: auto;
-        margin-right: 8px;
-    }
-    .checkbox-container label {
-        margin: 0;
-        font-weight: 400;
-        color: var(--text-dark);
-        font-size: 1.1rem;
-    }
-
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
   </style>
 </head>
@@ -284,11 +266,6 @@
             </div>
         </div>
         
-        <div class="checkbox-container">
-            <input type="checkbox" id="flexzonesCheckbox" checked>
-            <label for="flexzonesCheckbox">Flexzonen anzeigen</label>
-        </div>
-
         <div class="row">
           <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
         </div>
@@ -326,10 +303,8 @@
     const corsProxy = 'https://corsproxy.io/?';
 
     let map, layer, currentGeoJSON = null;
-    let flexzoneLayer;
     let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
     let selectedBrandDomain = null;
-    let allFlexzones = []; 
 
     const nextbikeIcon = L.icon({
         iconUrl: 'marker_nbblue.png',
@@ -371,13 +346,6 @@
                       `Freie Plätze: ${p.num_docks_available ?? '–'}<br>`+
                       `ID: ${p.station_id}`);
         }
-      }).addTo(map);
-
-      flexzoneLayer = L.geoJSON(null, {
-          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 },
-          onEachFeature: (f, l) => {
-              if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`);
-          }
       }).addTo(map);
     }
 
@@ -436,25 +404,10 @@
         
         updateAvailableBrands();
         $('#load-status').textContent = 'Bitte Auswahl treffen.';
-        
-        loadAllFlexzones();
       }catch(e){
         $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
         alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
       }
-    }
-
-    async function loadAllFlexzones() {
-        try {
-            const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
-            if (!flexzoneResp.ok) throw new Error(`Flexzonen-API HTTP ${flexzoneResp.status}`);
-            const flexzoneData = await flexzoneResp.json();
-            if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
-                allFlexzones = flexzoneData.geojson.nodeValue.features;
-            }
-        } catch(e) {
-            console.warn("Die globale Flexzonen-Liste konnte nicht geladen werden:", e);
-        }
     }
 
     function updateAvailableBrands(){
@@ -471,26 +424,23 @@
     }
 
     async function fetchCitiesForBrand(domain){
-      if(brandCitiesCache.has(domain)) return brandCitiesCache.get(domain);
-      const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
-      const resp = await fetch(url, { cache: 'no-store' });
-      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const out = [];
-      data.countries?.forEach(co => {
-        const cc = (co.country || co.country_code || '').toUpperCase();
-        co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
-      });
-      const deduped = [...new Map(out.map(item => [item.uid, item])).values()];
-      brandCitiesCache.set(domain, deduped);
-      return deduped;
+        const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
+        const resp = await fetch(url, { cache: 'no-store' });
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const out = [];
+        data.countries?.forEach(co => {
+            const cc = (co.country || co.country_code || '').toUpperCase();
+            co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
+        });
+        return [...new Map(out.map(item => [item.uid, item])).values()];
     }
 
     async function refreshCitySelect(){
       const brandKey = selectedBrandDomain;
       const citySel = $('#citySelect');
       const countryCode = ($('#countrySelect').value || '').toUpperCase();
-      citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
+      citySel.innerHTML = '<option value="">Alle Städte im System</option>';
       if(!brandKey){ citySel.disabled = true; return; }
       try{
         let items = await fetchCitiesForBrand(brandKey);
@@ -559,26 +509,12 @@
         
         $('#geojsonBtn').disabled = fc.features.length === 0;
 
-        flexzoneLayer.clearLayers();
-        if ($('#flexzonesCheckbox').checked && allFlexzones.length > 0 && selectedBrandDomain) {
-            const relevantFeatures = allFlexzones.filter(f => f.properties?.domain === selectedBrandDomain);
-            if (relevantFeatures.length > 0) {
-                const flexzoneGeoJSON = {
-                    type: "FeatureCollection",
-                    features: relevantFeatures
-                };
-                flexzoneLayer.addData(flexzoneGeoJSON);
-            }
-        }
-        
-        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
+        const combinedLayer = L.featureGroup([...layer.getLayers()]);
         if (combinedLayer.getLayers().length > 0) {
             const bounds = combinedLayer.getBounds();
             if (bounds.isValid()) {
                 map.fitBounds(bounds, {padding: [50, 50]});
             }
-        } else {
-             map.setView([51.1657, 10.4515], 6);
         }
 
       }catch(e){ 
@@ -619,16 +555,16 @@
         function filterAndDisplay() {
             const query = brandInput.value.toLowerCase();
             selectedBrandDomain = null;
+            refreshCitySelect();
             
             if (!query) {
                 brandResults.style.display = 'none';
                 return;
             }
             
-            let filtered = allSystems;
-            const countryCode = countrySelect.value;
-            if (countryCode) {
-                filtered = filtered.filter(s => s.country_code === countryCode);
+            let filtered = availableBrands;
+            if (countrySelect.value) {
+                filtered = filtered.filter(s => s.country_codes.has(countrySelect.value.toUpperCase()));
             }
             
             filtered = filtered.filter(s => s.name.toLowerCase().includes(query) || s.domain.toLowerCase().includes(query));
@@ -641,7 +577,7 @@
                     item.innerHTML = `${system.name} <small>(${system.domain})</small>`;
                     item.addEventListener('click', () => {
                         brandInput.value = system.name;
-                        selectedBrandDomain = system.domain;
+                        selectedBrandDomain = system.key;
                         brandResults.style.display = 'none';
                         refreshCitySelect();
                     });
@@ -649,7 +585,7 @@
                 });
                 brandResults.style.display = 'block';
             } else {
-                systemResults.style.display = 'none';
+                brandResults.style.display = 'none';
             }
         }
         
@@ -671,7 +607,6 @@
       loadLists();
       setupSidebars();
       setupBrandSearch();
-      //$('#countrySelect').addEventListener('change', updateAvailableBrands); 
       $('#loadBtn').addEventListener('click', loadData);
     });
   </script>
