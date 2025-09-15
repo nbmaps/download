@@ -556,19 +556,28 @@
             const systemName = `nextbike_${selectedBrandDomain}`;
             const gbfsUrl = `${corsProxy}https://gbfs.nextbike.net/maps/gbfs/v2/${systemName}/gbfs.json`;
 
-            const gbfsResp = await fetch(gbfsUrl);
-            if (gbfsResp.ok) {
-                const gbfsData = await gbfsResp.json();
-                const zonesUrl = gbfsData.data.de.feeds.find(f => f.name === 'geofencing_zones')?.url;
+            try {
+                const gbfsResp = await fetch(gbfsUrl);
+                if (!gbfsResp.ok) throw new Error(`GBFS manifest not found for domain ${selectedBrandDomain}, Status: ${gbfsResp.status}`);
 
-                if (zonesUrl) {
-                    const zonesResp = await fetch(`${corsProxy}${zonesUrl}`);
-                    if (zonesResp.ok) {
-                        const zonesData = await zonesResp.json();
-                        flexzoneLayer.addData(zonesData);
-                    } else { console.error(`GBFS zones fetch failed: ${zonesResp.status}`); }
+                const gbfsData = await gbfsResp.json();
+                const languages = Object.keys(gbfsData.data);
+                if (languages.length > 0) {
+                    const lang = languages[0];
+                    const feeds = gbfsData.data[lang].feeds;
+                    const zonesFeed = feeds.find(f => f.name === 'geofencing_zones');
+
+                    if (zonesFeed && zonesFeed.url) {
+                        const zonesResp = await fetch(`${corsProxy}${zonesFeed.url}`);
+                        if (zonesResp.ok) {
+                            const zonesData = await zonesResp.json();
+                            flexzoneLayer.addData(zonesData);
+                        }
+                    }
                 }
-            } else { console.error(`GBFS main fetch failed: ${gbfsResp.status}`); }
+            } catch (err) {
+                console.warn(`Could not load Flexzones for ${selectedBrandDomain}:`, err);
+            }
         }
         
         const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
