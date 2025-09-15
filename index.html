@@ -238,6 +238,8 @@
         display: flex;
         align-items: center;
         margin-top: 1rem;
+        padding: 8px;
+        background-color: var(--background-gray);
     }
     .checkbox-container input {
         width: auto;
@@ -246,6 +248,8 @@
     .checkbox-container label {
         margin: 0;
         font-weight: 400;
+        color: var(--text-dark);
+        font-size: 1.1rem;
     }
 
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
@@ -321,7 +325,7 @@
     const $ = sel => document.querySelector(sel);
 
     let map, layer, currentGeoJSON = null;
-    let flexzoneLayer; // NEU: Eigene Ebene für Flexzonen
+    let flexzoneLayer;
     let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
     let selectedBrandDomain = null;
     const brandCitiesCache = new Map();
@@ -368,30 +372,143 @@
         }
       }).addTo(map);
 
-      // NEU: Initialisierung der Flexzonen-Ebene
       flexzoneLayer = L.geoJSON(null, {
-          style: {
-              color: "#0098FF",
-              weight: 2,
-              opacity: 0.8,
-              fillColor: "#0098FF",
-              fillOpacity: 0.2
-          }
+          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 }
       }).addTo(map);
     }
 
     function option(value, label){ const o = document.createElement('option'); o.value = value; o.textContent = label; return o; }
 
-    // ... (restliche Funktionen bleiben gleich bis loadData)
+    function dedupeCountries(countriesIn){
+      const mapC = new Map();
+      countriesIn.forEach(c => {
+        const code = (c.country || c.country_code || '').toUpperCase();
+        const name = c.country_name || '';
+        if(name && code && !mapC.has(code)) mapC.set(code, { country_code: code, country_name: name });
+      });
+      let arr = Array.from(mapC.values());
+      arr.sort((a,b) => (a.country_name==='Germany' ? -1 : b.country_name==='Germany' ? 1 : (a.country_name||'').localeCompare(b.country_name||'')));
+      return arr;
+    }
 
+    function buildBrands(dataCountries) {
+        const mapB = new Map();
+        dataCountries.forEach(topLevelObject => {
+            const geo_country_code = (topLevelObject.country || '').toUpperCase();
+            const processEntity = (entity, nameFallback) => {
+                const domain = (entity.domain || '').toLowerCase();
+                if (!domain) return;
+                const name = entity.name || entity.alias || nameFallback || `System ${domain}`;
+                if (!mapB.has(domain)) {
+                    mapB.set(domain, { key: domain, domain, name, country_codes: new Set() });
+                }
+                if (geo_country_code) mapB.get(domain).country_codes.add(geo_country_code);
+            };
+            processEntity(topLevelObject);
+            if (topLevelObject.cities) {
+                topLevelObject.cities.forEach(city => processEntity(city, city.city));
+            }
+        });
+        return Array.from(mapB.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    async function loadLists(){
+      $('#load-status').style.visibility = 'visible';
+      $('#load-status').textContent = 'Systeme werden geladen...';
+      try{
+        const resp = await fetch('https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0', { cache: 'no-store' });
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data || !data.countries) throw new Error("API-Antwort ist ungültig.");
+
+        rawCountries = data.countries;
+        countryList = dedupeCountries(rawCountries);
+        brandList = buildBrands(rawCountries);
+
+        const cSel = $('#countrySelect'); cSel.innerHTML = '';
+        cSel.appendChild(option('', 'Alle Länder (weltweit)'));
+        countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
+        
+        updateAvailableBrands();
+        $('#load-status').textContent = 'Bitte Auswahl treffen.';
+      }catch(e){
+        $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
+        alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
+      }
+    }
+
+    function updateAvailableBrands(){
+      const countryCode = ($('#countrySelect').value || '').toUpperCase();
+      const brandInput = $('#brandInput');
+      
+      availableBrands = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
+      
+      brandInput.value = '';
+      selectedBrandDomain = null;
+      brandInput.disabled = false;
+      brandInput.placeholder = `${availableBrands.length} Marken/Systeme verfügbar...`;
+      refreshCitySelect();
+    }
+
+    async function fetchCitiesForBrand(domain){
+      if(brandCitiesCache.has(domain)) return brandCitiesCache.get(domain);
+      const resp = await fetch(`https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`, { cache: 'no-store' });
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const out = [];
+      data.countries?.forEach(co => {
+        const cc = (co.country || co.country_code || '').toUpperCase();
+        co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
+      });
+      const deduped = [...new Map(out.map(item => [item.uid, item])).values()];
+      brandCitiesCache.set(domain, deduped);
+      return deduped;
+    }
+
+    async function refreshCitySelect(){
+      const brandKey = selectedBrandDomain;
+      const citySel = $('#citySelect');
+      const countryCode = ($('#countrySelect').value || '').toUpperCase();
+      citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
+      if(!brandKey){ citySel.disabled = true; return; }
+      try{
+        let items = await fetchCitiesForBrand(brandKey);
+        if(countryCode) items = items.filter(c => (c.country_code||'') === countryCode);
+        items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+        items.forEach(c => citySel.appendChild(option(String(c.uid), c.name)));
+        citySel.disabled = false;
+      }catch(e){ console.error(e); citySel.disabled = true; }
+    }
+
+    function fcFromNextbike(json){
+      const features = [];
+      json.countries?.forEach(country => {
+        country.cities?.forEach(city => {
+          const domain = city.domain || '';
+          city.places?.forEach(place => {
+            if(typeof place.lat !== 'number' || typeof place.lng !== 'number') return;
+            features.push({ 
+              type:'Feature', 
+              geometry:{ type:'Point', coordinates:[place.lng, place.lat] }, 
+              properties: {
+                station_id: String(place.number ?? place.uid ?? ''), name: place.name || '', address: place.address || '',
+                capacity: place.bike_racks ?? null, num_bikes_available: place.bikes ?? null, num_docks_available: place.free_racks ?? null,
+                city_uid: city.uid ?? null, city_name: city.name || city.city || city.alias || '', domain, country_name: country.country_name || ''
+              }
+            });
+          });
+        });
+      });
+      return { type:'FeatureCollection', features };
+    }
+    
     async function loadData(){
       const loadBtn = $('#loadBtn');
       loadBtn.disabled = true;
       $('#loadIcon').innerHTML = '<span class="spinner"></span>';
       $('#load-status').textContent = 'Lade Stationen...';
       
-      try {
-        // Bestehende Logik zum Laden der Stationen
+      try{
         const domain = selectedBrandDomain, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
         let url = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
@@ -418,41 +535,39 @@
 
         $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
-
-        if(fc.features.length > 0){ 
-            const bounds = L.geoJSON(fc).getBounds(); 
-            if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
-        }
+        
         $('#geojsonBtn').disabled = fc.features.length === 0;
 
-        // NEU: Logik zum Laden der Flexzonen
         flexzoneLayer.clearLayers();
         if ($('#flexzonesCheckbox').checked) {
             const flexzoneResp = await fetch('https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c');
-            if (!flexzoneResp.ok) throw new Error(`Flexzone HTTP ${flexzoneResp.status}`);
-            const flexzoneData = await flexzoneResp.json();
-            
-            // Finde alle City-IDs der geladenen Stationen
-            const cityIds = new Set(fc.features.map(f => f.properties.city_uid));
-
-            // Filtere Flexzonen, die zu den geladenen Städten gehören
-            const relevantFlexzones = flexzoneData.filter(zone => cityIds.has(zone.city_id));
-            
-            const flexzoneGeoJSON = {
-                type: "FeatureCollection",
-                features: relevantFlexzones.map(zone => ({
-                    type: "Feature",
-                    properties: { name: zone.name },
-                    geometry: {
-                        type: "Polygon",
-                        coordinates: [zone.geo_json.coordinates]
-                    }
-                }))
-            };
-            flexzoneLayer.addData(flexzoneGeoJSON);
+            if (!flexzoneResp.ok) console.error(`Flexzone HTTP ${flexzoneResp.status}`); // Log error but don't stop execution
+            else {
+              const flexzoneData = await flexzoneResp.json();
+              const cityIds = new Set(fc.features.map(f => f.properties.city_uid));
+              const relevantFlexzones = flexzoneData.filter(zone => cityIds.has(zone.city_id));
+              
+              const flexzoneGeoJSON = {
+                  type: "FeatureCollection",
+                  features: relevantFlexzones.map(zone => ({
+                      type: "Feature",
+                      properties: { name: zone.name },
+                      geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
+                  }))
+              };
+              flexzoneLayer.addData(flexzoneGeoJSON);
+            }
+        }
+        
+        if(fc.features.length > 0){ 
+            const bounds = layer.getBounds();
+            if(flexzoneLayer.getLayers().length > 0) {
+              bounds.extend(flexzoneLayer.getBounds());
+            }
+            if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
         }
 
-      } catch(e){ 
+      }catch(e){ 
           $('#load-status').textContent = 'Fehler: '+e.message; 
           $('#geojsonBtn').disabled = true; 
       }
@@ -461,11 +576,6 @@
           $('#loadIcon').innerHTML = '';
       }
     }
-    
-    // Alle anderen Funktionen (downloadGeoJSON, setupSidebars, setupBrandSearch, etc.) bleiben unverändert.
-    // Hier wird der restliche JavaScript-Code eingefügt, der in den vorherigen Antworten schon vorhanden war.
-    // ...
-    // (Ich füge den restlichen Code hier zur Vollständigkeit ein)
 
     function downloadGeoJSON(){ 
       if(!currentGeoJSON) return; 
