@@ -545,29 +545,17 @@
                 console.error(`Flexzone HTTP ${flexzoneResp.status}`);
             } else {
               const flexzoneData = await flexzoneResp.json();
+              const loadedDomains = new Set(fc.features.map(f => f.properties.domain).filter(d => d));
               
-              const loadedDomains = new Set(fc.features.map(f => f.properties.domain));
-              
-              // --- DEBUGGING-AUSGABE HINZUGEFÜGT ---
-              console.log("DEBUG: Domains von geladenen Stationen:", Array.from(loadedDomains));
-
               const relevantFlexzones = [];
-              const availableFlexzoneDomains = []; // Nur für Debugging
-              if (flexzoneData.countries) {
-                flexzoneData.countries.forEach(country => {
-                    country.cities.forEach(city => {
-                        if (city.domain) availableFlexzoneDomains.push(city.domain); // Für Debugging füllen
-                        if (loadedDomains.has(city.domain) && city.flexzones) {
-                            relevantFlexzones.push(...city.flexzones);
-                        }
-                    });
-                });
+              if (flexzoneData.CITIES) {
+                  flexzoneData.CITIES.forEach(city => {
+                      if (loadedDomains.has(city.domain) && city.flexzones) {
+                          relevantFlexzones.push(...city.flexzones);
+                      }
+                  });
               }
               
-              // --- DEBUGGING-AUSGABE HINZUGEFÜGT ---
-              console.log("DEBUG: Domains in Flexzonen-API gefunden:", availableFlexzoneDomains);
-              console.log("DEBUG: Anzahl gefundener, passender Flexzonen:", relevantFlexzones.length);
-
               if (relevantFlexzones.length > 0) {
                   const flexzoneGeoJSON = {
                       type: "FeatureCollection",
