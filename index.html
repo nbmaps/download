@@ -179,6 +179,41 @@
         text-align: center;
         visibility: hidden;
     }
+    
+    /* NEUE STYLES FÜR DAS SUCHFELD */
+    .autocomplete-container {
+        position: relative;
+    }
+    .autocomplete-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--text-light);
+        border: 1px solid var(--border-gray);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1001;
+        display: none; /* Standardmäßig versteckt */
+    }
+    .autocomplete-item {
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active {
+        background-color: var(--nextbike-light-blue);
+        color: var(--text-light);
+    }
+    .autocomplete-item small {
+        color: var(--text-muted);
+        margin-left: 8px;
+    }
+    .autocomplete-item:hover small, .autocomplete-item.active small {
+        color: var(--text-light);
+    }
+    /* ENDE NEUE STYLES */
 
     .spinner {
         border: 2px solid rgba(255,255,255,0.3);
@@ -203,9 +238,11 @@
         <label for="countrySelect">1) Land wählen</label>
         <select id="countrySelect"></select>
 
-        <label for="brandSelect">2) Marke/System wählen</label>
-        <select id="brandSelect" disabled></select>
-
+        <label for="brandInput">2) Marke/System suchen</label>
+        <div class="autocomplete-container">
+            <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
+            <div class="autocomplete-results" id="brandResults"></div>
+        </div>
         <label for="citySelect">3) Stadt filtern (optional)</label>
         <select id="citySelect" disabled></select>
 
@@ -259,7 +296,8 @@
     const $ = sel => document.querySelector(sel);
 
     let map, layer, currentGeoJSON = null;
-    let countryList = [], rawCountries = [], brandList = [];
+    let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
+    let selectedBrandDomain = null;
     const brandCitiesCache = new Map();
 
     function initMap(){
@@ -329,7 +367,7 @@
         cSel.appendChild(option('', 'Alle Länder (weltweit)'));
         countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
         
-        refreshBrandSelect();
+        updateAvailableBrands();
         $('#load-status').textContent = 'Bitte Auswahl treffen.';
       }catch(e){
         $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
@@ -337,15 +375,16 @@
       }
     }
 
-    function refreshBrandSelect(){
+    function updateAvailableBrands(){
       const countryCode = ($('#countrySelect').value || '').toUpperCase();
-      const bSel = $('#brandSelect');
-      let list = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
+      const brandInput = $('#brandInput');
       
-      bSel.innerHTML = '';
-      bSel.appendChild(option('', countryCode ? 'Alle Marken im Land' : 'Alle Marken (weltweit)'));
-      list.forEach(b => bSel.appendChild(option(b.key, `${b.name} · ${b.domain}`)));
-      bSel.disabled = false;
+      availableBrands = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
+      
+      brandInput.value = '';
+      selectedBrandDomain = null;
+      brandInput.disabled = false;
+      brandInput.placeholder = `${availableBrands.length} Marken/Systeme verfügbar...`;
       refreshCitySelect();
     }
 
@@ -365,7 +404,7 @@
     }
 
     async function refreshCitySelect(){
-      const brandKey = $('#brandSelect').value;
+      const brandKey = selectedBrandDomain;
       const citySel = $('#citySelect');
       const countryCode = ($('#countrySelect').value || '').toUpperCase();
       citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
@@ -408,7 +447,7 @@
       $('#load-status').textContent = 'Lade Stationen...';
       
       try{
-        const domain = $('#brandSelect').value, cityUid = $('#citySelect').value;
+        const domain = selectedBrandDomain, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
         let url = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
         if(cityUid) url += `&city=${cityUid}`;
@@ -430,7 +469,6 @@
         const timestamp = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
         const statusDiv = $('#load-status');
         statusDiv.innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
-        statusDiv.style.visibility = 'visible';
 
         $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
@@ -474,12 +512,64 @@
         });
     }
 
+    function setupBrandSearch() {
+        const brandInput = $('#brandInput');
+        const brandResults = $('#brandResults');
+
+        brandInput.addEventListener('input', () => {
+            const query = brandInput.value.toLowerCase();
+            selectedBrandDomain = null; // Auswahl zurücksetzen
+            refreshCitySelect();
+
+            if (!query) {
+                brandResults.style.display = 'none';
+                return;
+            }
+            
+            const filtered = availableBrands.filter(brand => 
+                brand.name.toLowerCase().includes(query) || 
+                brand.domain.toLowerCase().includes(query)
+            );
+            
+            brandResults.innerHTML = '';
+            if (filtered.length > 0) {
+                filtered.forEach(brand => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    item.innerHTML = `${brand.name} <small>(${brand.domain})</small>`;
+                    item.dataset.domain = brand.key;
+                    item.dataset.name = brand.name;
+                    brandResults.appendChild(item);
+                });
+                brandResults.style.display = 'block';
+            } else {
+                brandResults.style.display = 'none';
+            }
+        });
+
+        brandResults.addEventListener('click', (e) => {
+            const item = e.target.closest('.autocomplete-item');
+            if (item) {
+                brandInput.value = item.dataset.name;
+                selectedBrandDomain = item.dataset.domain;
+                brandResults.style.display = 'none';
+                refreshCitySelect();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!brandInput.contains(e.target)) {
+                brandResults.style.display = 'none';
+            }
+        });
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
       loadLists();
       setupSidebars();
-      $('#countrySelect').addEventListener('change', refreshBrandSelect);
-      $('#brandSelect').addEventListener('change', refreshCitySelect);
+      setupBrandSearch();
+      $('#countrySelect').addEventListener('change', updateAvailableBrands);
       $('#loadBtn').addEventListener('click', loadData);
       $('#geojsonBtn').addEventListener('click', downloadGeoJSON);
     });
