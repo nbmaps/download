@@ -233,7 +233,7 @@
         vertical-align: middle;
         margin-right: 6px;
     }
-
+    
     .checkbox-container {
         display: flex;
         align-items: center;
@@ -541,11 +541,23 @@
         flexzoneLayer.clearLayers();
         if ($('#flexzonesCheckbox').checked) {
             const flexzoneResp = await fetch('https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c');
-            if (!flexzoneResp.ok) console.error(`Flexzone HTTP ${flexzoneResp.status}`); // Log error but don't stop execution
-            else {
+            if (!flexzoneResp.ok) {
+                console.error(`Flexzone HTTP ${flexzoneResp.status}`);
+            } else {
               const flexzoneData = await flexzoneResp.json();
               const cityIds = new Set(fc.features.map(f => f.properties.city_uid));
-              const relevantFlexzones = flexzoneData.filter(zone => cityIds.has(zone.city_id));
+              
+              // KORRIGIERTE LOGIK: Iteriere durch die verschachtelte Struktur
+              const relevantFlexzones = [];
+              if (flexzoneData.countries) {
+                flexzoneData.countries.forEach(country => {
+                    country.cities.forEach(city => {
+                        if (cityIds.has(city.uid) && city.flexzones) {
+                            relevantFlexzones.push(...city.flexzones);
+                        }
+                    });
+                });
+              }
               
               const flexzoneGeoJSON = {
                   type: "FeatureCollection",
@@ -559,9 +571,9 @@
             }
         }
         
-        if(fc.features.length > 0){ 
-            const bounds = layer.getBounds();
-            if(flexzoneLayer.getLayers().length > 0) {
+        if(fc.features.length > 0 || flexzoneLayer.getLayers().length > 0){ 
+            const bounds = fc.features.length > 0 ? layer.getBounds() : flexzoneLayer.getBounds();
+            if(fc.features.length > 0 && flexzoneLayer.getLayers().length > 0) {
               bounds.extend(flexzoneLayer.getBounds());
             }
             if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
