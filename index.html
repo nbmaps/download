@@ -538,39 +538,9 @@
         
         $('#geojsonBtn').disabled = fc.features.length === 0;
 
+        // Die Logik zum Laden der Flexzonen wird für den Test ignoriert
         flexzoneLayer.clearLayers();
-        if ($('#flexzonesCheckbox').checked) {
-            const flexzoneResp = await fetch('https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c');
-            if (!flexzoneResp.ok) {
-                console.error(`Flexzone HTTP ${flexzoneResp.status}`);
-            } else {
-              const flexzoneData = await flexzoneResp.json();
-              const loadedDomains = new Set(fc.features.map(f => f.properties.domain).filter(d => d));
-              
-              const relevantFlexzones = [];
-              if (flexzoneData.countries) { // KORRIGIERTE STRUKTUR
-                  flexzoneData.countries.forEach(country => {
-                      country.cities.forEach(city => {
-                          if (loadedDomains.has(city.domain) && city.flexzones) {
-                              relevantFlexzones.push(...city.flexzones);
-                          }
-                      });
-                  });
-              }
-              
-              if (relevantFlexzones.length > 0) {
-                  const flexzoneGeoJSON = {
-                      type: "FeatureCollection",
-                      features: relevantFlexzones.map(zone => ({
-                          type: "Feature",
-                          properties: { name: zone.name },
-                          geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
-                      }))
-                  };
-                  flexzoneLayer.addData(flexzoneGeoJSON);
-              }
-            }
-        }
+        // if ($('#flexzonesCheckbox').checked) { ... }
         
         const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
         if (combinedLayer.getLayers().length > 0) {
@@ -589,6 +559,51 @@
           $('#loadIcon').innerHTML = '';
       }
     }
+
+    // --- NEUE DEBUG-FUNKTION ---
+    async function loadLeipzigFlexzoneForDebug() {
+        try {
+            console.log("DEBUG: Starte Ladevorgang für Leipziger Flexzone...");
+            const flexzoneResp = await fetch('https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c');
+            if (!flexzoneResp.ok) {
+                throw new Error(`Flexzone HTTP ${flexzoneResp.status}`);
+            }
+            const flexzoneData = await flexzoneResp.json();
+            
+            let leipzigCity = null;
+            if (flexzoneData.countries) {
+                for (const country of flexzoneData.countries) {
+                    const foundCity = country.cities.find(city => city.name === 'Leipzig');
+                    if (foundCity) {
+                        leipzigCity = foundCity;
+                        break;
+                    }
+                }
+            }
+
+            if (leipzigCity && leipzigCity.flexzones) {
+                console.log("DEBUG: Leipziger Flexzonen gefunden:", leipzigCity.flexzones);
+                const flexzoneGeoJSON = {
+                    type: "FeatureCollection",
+                    features: leipzigCity.flexzones.map(zone => ({
+                        type: "Feature",
+                        properties: { name: zone.name },
+                        geometry: { type: "Polygon", coordinates: [zone.geo_json.coordinates] }
+                    }))
+                };
+                flexzoneLayer.clearLayers().addData(flexzoneGeoJSON);
+                map.fitBounds(flexzoneLayer.getBounds(), {padding: [50, 50]});
+                console.log("DEBUG: Leipziger Flexzonen zur Karte hinzugefügt.");
+            } else {
+                console.error("DEBUG: Keine Flexzonen für Leipzig in der API-Antwort gefunden.");
+                alert("Konnte keine Flexzonen für Leipzig finden.");
+            }
+        } catch(e) {
+            console.error("DEBUG: Kritischer Fehler beim Laden der Flexzone:", e);
+            alert("Ein Fehler ist beim Laden der Flexzone aufgetreten. Details in der Konsole.");
+        }
+    }
+
 
     function downloadGeoJSON(){ 
       if(!currentGeoJSON) return; 
@@ -672,6 +687,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
+      loadLeipzigFlexzoneForDebug(); // Temporärer Testaufruf
       loadLists();
       setupSidebars();
       setupBrandSearch();
