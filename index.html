@@ -68,16 +68,6 @@
         padding: 20px;
         overflow-y: auto;
         flex-grow: 1;
-        visibility: visible;
-        opacity: 1;
-        transition: visibility 0s, opacity 0.2s linear;
-    }
-
-    .wrap.left-collapsed #left-panel .panel-content,
-    .wrap.right-collapsed #right-panel .panel-content {
-        visibility: hidden;
-        opacity: 0;
-        transition: visibility 0s 0.2s, opacity 0.2s linear;
     }
     
     .toggle-container {
@@ -213,7 +203,6 @@
         color: var(--text-light);
     }
 
-    /* NEUE STYLES ZUR HERVORHEBUNG */
     .label-emphasized {
         color: var(--text-dark);
         font-weight: 700;
@@ -231,7 +220,6 @@
         border-color: var(--nextbike-light-blue);
         box-shadow: 0 0 0 3px rgba(0, 152, 255, 0.2);
     }
-    /* ENDE NEUE STYLES */
 
     .spinner {
         border: 2px solid rgba(255,255,255,0.3);
@@ -297,7 +285,7 @@
     </div>
 
     <section class="panel" id="right-panel">
-        <div class="panel-content" style="display: flex; flex-direction: column; padding-top: 20px;">
+        <div class="panel-content" style="display: flex; flex-direction: column;">
             <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
             <div class="row">
                 <button class="primary" id="geojsonBtn" disabled>GeoJSON download</button>
@@ -318,8 +306,41 @@
     const brandCitiesCache = new Map();
 
     function initMap(){
-      map = L.map('map');
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'&copy; OpenStreetMap' }).addTo(map);
+      // -- START: Änderungen für Ebenen-Steuerung --
+      
+      // 1. Definiere die verschiedenen Kartenebenen
+      const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      });
+
+      const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 20
+      });
+
+      const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+      });
+
+      // 2. Erstelle ein Objekt, das die Ebenen für das Steuerelement enthält
+      const baseMaps = {
+          "Standard": osm,
+          "Hell (CARTO)": positron,
+          "Satellit (Esri)": satellite
+      };
+
+      // 3. Initialisiere die Karte und setze eine Standard-Ebene
+      map = L.map('map', {
+          layers: [osm] // Setzt OpenStreetMap als Standard fest
+      });
+      
+      // 4. Füge das Steuerelement zur Karte hinzu
+      L.control.layers(baseMaps).addTo(map);
+
+      // -- ENDE: Änderungen für Ebenen-Steuerung --
+
       map.setView([51.1657, 10.4515], 6);
       layer = L.geoJSON(null, {
         onEachFeature: (f, l) => {
