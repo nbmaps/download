@@ -17,6 +17,7 @@
         --text-dark: #212529;
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
+        --code-bg: #212529;
         --left-panel-width: 380px;
         --right-panel-width: 380px;
         --toggle-btn-width: 24px;
@@ -43,7 +44,7 @@
         display: grid;
         grid-template-columns: var(--left-panel-width) var(--toggle-btn-width) 1fr var(--toggle-btn-width) var(--right-panel-width);
         gap: 0;
-        padding: 15px;
+        padding: 0; /* Geändert: Kein Abstand zum Rand */
         flex-grow: 1;
         overflow: hidden;
         transition: grid-template-columns 0.35s ease-in-out;
@@ -54,14 +55,14 @@
 
     .panel {
         background: var(--text-light);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        border: 1px solid var(--border-gray);
+        border: none; /* Geändert */
+        border-radius: 0; /* Geändert */
     }
-    #left-panel { border-radius: 12px 0 0 12px; }
-    #right-panel { border-radius: 0 12px 12px 0; }
+    #left-panel { border-right: 1px solid var(--border-gray); }
+    #right-panel { border-left: 1px solid var(--border-gray); }
 
     .panel-content {
         padding: 20px;
@@ -70,6 +71,12 @@
         visibility: visible;
         opacity: 1;
         transition: visibility 0s, opacity 0.2s linear;
+    }
+    
+    /* NEU: Flexbox-Layout für linkes Panel, um Inhalt nach unten zu schieben */
+    #left-panel .panel-content {
+        display: flex;
+        flex-direction: column;
     }
 
     .wrap.left-collapsed #left-panel .panel-content,
@@ -85,10 +92,11 @@
         justify-content: center;
         cursor: pointer;
         background-color: #fff;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border-top: 1px solid var(--border-gray);
+        border-bottom: 1px solid var(--border-gray);
     }
-    #left-toggle-container { border-radius: 0 8px 8px 0; border: 1px solid var(--border-gray); border-left: none; }
-    #right-toggle-container { border-radius: 8px 0 0 8px; border: 1px solid var(--border-gray); border-right: none; }
+    #left-toggle-container { border-right: 1px solid var(--border-gray); }
+    #right-toggle-container { border-left: 1px solid var(--border-gray); }
 
     .panel-toggle-btn {
         background: transparent;
@@ -99,7 +107,6 @@
     }
 
     #map-container {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         overflow: hidden;
         z-index: 100;
     }
@@ -109,14 +116,14 @@
     #geojson-output {
         width: 100%;
         height: 100%;
-        border-radius: 8px;
+        border-radius: 0; /* Geändert */
         border: 1px solid var(--border-gray);
         font-family: monospace;
         font-size: 12px;
         white-space: pre;
         resize: none;
-        background-color: var(--text-light); /* Geändert */
-        color: var(--text-dark); /* Geändert */
+        background-color: var(--text-light);
+        color: var(--text-dark);
         padding: 12px;
     }
     
@@ -132,7 +139,7 @@
     select, input[type="text"] {
         width: 100%;
         padding: 8px 10px;
-        border-radius: 6px;
+        border-radius: 0; /* Geändert */
         border: 1px solid var(--border-gray);
         background: #fff;
         color: var(--text-dark);
@@ -142,7 +149,7 @@
     
     button {
         appearance: none;
-        border-radius: 6px;
+        border-radius: 0; /* Geändert */
         padding: 10px 14px;
         font-weight: 600;
         cursor: pointer;
@@ -174,7 +181,7 @@
         color: var(--text-muted);
         background-color: var(--background-gray);
         padding: 8px 12px;
-        border-radius: 6px;
+        border-radius: 0; /* Geändert */
         text-align: center;
         visibility: hidden;
     }
@@ -190,7 +197,7 @@
         background: var(--text-light);
         border: 1px solid var(--border-gray);
         border-top: none;
-        border-radius: 0 0 6px 6px;
+        border-radius: 0; /* Geändert */
         max-height: 250px;
         overflow-y: auto;
         z-index: 1001;
@@ -231,35 +238,37 @@
   <div class="wrap" id="main-wrap">
     <section class="panel" id="left-panel">
       <div class="panel-content">
-        <label for="countrySelect">1) Land wählen (optional)</label>
-        <select id="countrySelect"></select>
+        <div style="margin-top: auto;">
+            <label for="countrySelect">1) Land wählen (optional)</label>
+            <select id="countrySelect"></select>
 
-        <label for="brandInput">2) Marke/System suchen</label>
-        <div class="autocomplete-container">
-            <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
-            <div class="autocomplete-results" id="brandResults"></div>
-        </div>
-
-        <label for="citySelect">3) Stadt filtern (optional)</label>
-        <select id="citySelect" disabled></select>
-
-        <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
-
-        <div class="grid">
-            <div>
-                <label for="fileBase">Dateiname</label>
-                <input id="fileBase" type="text" value="nextbike_stations" />
+            <label for="brandInput">2) Marke/System suchen</label>
+            <div class="autocomplete-container">
+                <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
+                <div class="autocomplete-results" id="brandResults"></div>
             </div>
-            <div>
-                <label for="quickFilter">Schnellfilter</label>
-                <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+
+            <label for="citySelect">3) Stadt filtern (optional)</label>
+            <select id="citySelect" disabled></select>
+
+            <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
+
+            <div class="grid">
+                <div>
+                    <label for="fileBase">Dateiname</label>
+                    <input id="fileBase" type="text" value="nextbike_stations" />
+                </div>
+                <div>
+                    <label for="quickFilter">Schnellfilter</label>
+                    <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+                </div>
             </div>
+            
+            <div class="row">
+              <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
+            </div>
+            <div class="load-status" id="load-status">Initialisiere...</div>
         </div>
-        
-        <div class="row">
-          <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
-        </div>
-        <div class="load-status" id="load-status">Initialisiere...</div>
       </div>
     </section>
 
@@ -276,7 +285,7 @@
     </div>
 
     <section class="panel" id="right-panel">
-        <div class="panel-content" style="display: flex; flex-direction: column; padding-top: 20px;">
+        <div class="panel-content" style="display: flex; flex-direction: column;">
             <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
             <div class="row">
                 <button class="primary" id="geojsonBtn" disabled>GeoJSON download</button>
