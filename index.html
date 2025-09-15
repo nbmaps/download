@@ -83,7 +83,7 @@
         display: block; font-size: 1.1rem; color: var(--text-muted);
         margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 600;
     }
-    input[type="text"] {
+    select, input[type="text"] {
         width: 100%; padding: 8px 10px; border-radius: 0;
         border: 1px solid var(--border-gray); background: #fff;
         color: var(--text-dark); font-size: 1.1rem; font-family: 'Inter', sans-serif;
@@ -115,6 +115,8 @@
     }
     .autocomplete-item { padding: 8px 12px; cursor: pointer; }
     .autocomplete-item:hover { background-color: var(--nextbike-blue); color: var(--text-light); }
+    .autocomplete-item small { color: var(--text-muted); margin-left: 8px; }
+    .autocomplete-item:hover small { color: var(--text-light); }
 
     .spinner {
         border: 2px solid rgba(255,255,255,0.3);
@@ -136,10 +138,13 @@
   <div class="main-container" id="main-container">
     <section class="panel" id="left-panel">
       <div class="panel-content">
-        <label for="systemInput">System suchen</label>
+        <label for="countrySelect">1) Land wählen (optional)</label>
+        <select id="countrySelect"></select>
+
+        <label for="brandInput">2) Marke/System suchen</label>
         <div class="autocomplete-container">
-            <input type="text" id="systemInput" placeholder="System tippen..." disabled>
-            <div class="autocomplete-results" id="systemResults"></div>
+            <input type="text" id="brandInput" placeholder="System tippen..." disabled>
+            <div class="autocomplete-results" id="brandResults"></div>
         </div>
         
         <div class="checkbox-container">
@@ -196,16 +201,46 @@
     async function loadSystemList() {
         $('#load-status').textContent = 'Lade Systemliste...';
         try {
-            const url = `${corsProxy}https://gbfs.nextbike.net/systems.json`;
+            const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0`;
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
-            allSystems = data.data.systems;
+
+            const countryMap = new Map();
+            data.countries.forEach(c => {
+                const code = (c.country || c.country_code || '').toUpperCase();
+                const name = c.country_name || c.name || '';
+                if(name && code && !countryMap.has(code)) countryMap.set(code, name);
+            });
+
+            const countryList = Array.from(countryMap.entries())
+                .map(([code, name]) => ({code, name}))
+                .sort((a,b) => (a.name==='Germany' ? -1 : b.name==='Germany' ? 1 : a.name.localeCompare(b.name)));
+            
+            const cSel = $('#countrySelect');
+            cSel.innerHTML = '<option value="">Alle Länder</option>';
+            countryList.forEach(c => cSel.innerHTML += `<option value="${c.code}">${c.name}</option>`);
+
+            const systemMap = new Map();
+            data.countries.forEach(country => {
+                const countryCode = (country.country || country.country_code || '').toUpperCase();
+                (country.cities || []).forEach(city => {
+                    const domain = city.domain || '';
+                    if (!domain || systemMap.has(domain)) return;
+                    systemMap.set(domain, {
+                        name: city.name || city.alias || `System ${domain}`,
+                        domain: domain,
+                        country_code: countryCode
+                    });
+                });
+            });
+            allSystems = Array.from(systemMap.values()).sort((a,b) => a.name.localeCompare(b.name));
             
             const systemInput = $('#systemInput');
             systemInput.disabled = false;
             systemInput.placeholder = `${allSystems.length} Systeme verfügbar...`;
             $('#load-status').textContent = 'Bitte System wählen.';
+
         } catch(e) {
             $('#load-status').textContent = 'Fehler beim Laden der Systeme.';
             alert('Die Systemliste konnte nicht geladen werden.');
@@ -216,9 +251,11 @@
     function setupSystemSearch() {
         const systemInput = $('#systemInput');
         const systemResults = $('#systemResults');
+        const countrySelect = $('#countrySelect');
 
-        systemInput.addEventListener('input', () => {
+        function filterAndDisplay() {
             const query = systemInput.value.toLowerCase();
+            const countryCode = countrySelect.value;
             selectedSystem = null;
 
             if (!query) {
@@ -226,14 +263,19 @@
                 return;
             }
             
-            const filtered = allSystems.filter(s => s.name.toLowerCase().includes(query));
+            let filtered = allSystems;
+            if (countryCode) {
+                filtered = filtered.filter(s => s.country_code === countryCode);
+            }
+            
+            filtered = filtered.filter(s => s.name.toLowerCase().includes(query) || s.domain.toLowerCase().includes(query));
             
             systemResults.innerHTML = '';
             if (filtered.length > 0) {
                 filtered.slice(0, 100).forEach(system => {
                     const item = document.createElement('div');
                     item.className = 'autocomplete-item';
-                    item.textContent = system.name;
+                    item.innerHTML = `${system.name} <small>(${system.domain})</small>`;
                     item.addEventListener('click', () => {
                         systemInput.value = system.name;
                         selectedSystem = system;
@@ -245,7 +287,14 @@
             } else {
                 systemResults.style.display = 'none';
             }
+        }
+
+        systemInput.addEventListener('input', filterAndDisplay);
+        countrySelect.addEventListener('change', () => {
+            systemInput.value = '';
+            filterAndDisplay();
         });
+
         document.addEventListener('click', (e) => {
             if (!$('.autocomplete-container').contains(e.target)) {
                 systemResults.style.display = 'none';
@@ -268,7 +317,8 @@
         flexzoneLayer.clearLayers();
 
         try {
-            const gbfsUrl = `${corsProxy}${selectedSystem.url}`; // Korrigiert: .url statt .gbfs_href
+            const systemId = `nextbike_${selectedSystem.domain}`;
+            const gbfsUrl = `${corsProxy}https://gbfs.nextbike.net/maps/gbfs/v2/${systemId}/gbfs.json`;
             const gbfsResp = await fetch(gbfsUrl);
             if (!gbfsResp.ok) throw new Error(`GBFS für ${selectedSystem.name} nicht gefunden.`);
             const gbfsData = await gbfsResp.json();
@@ -305,7 +355,6 @@
             } else {
                  $('#load-status').textContent = `Keine Stations-Feeds für ${selectedSystem.name} gefunden.`;
             }
-
 
             if ($('#flexzonesCheckbox').checked && zonesUrl) {
                 const zonesResp = await fetch(`${corsProxy}${zonesUrl}`);
