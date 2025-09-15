@@ -18,8 +18,13 @@
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
         --code-bg: #212529;
-        --left-panel-width: 420px;
-        --right-panel-width: 420px;
+        --left-panel-width: 380px;
+        --right-panel-width: 380px;
+        --toggle-btn-width: 24px;
+    }
+
+    html {
+        font-size: 85%; /* Global kleinere Schrift */
     }
 
     * { box-sizing: border-box; }
@@ -34,27 +39,13 @@
         height: 100vh;
         overflow: hidden;
     }
-
-    header {
-        background-color: var(--nextbike-dark-blue);
-        color: var(--text-light);
-        padding: 16px 24px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        z-index: 1000;
-        flex-shrink: 0;
-    }
-
-    h1 {
-        font-size: 22px;
-        margin: 0;
-        font-weight: 700;
-    }
     
     .wrap {
         display: grid;
-        grid-template-columns: var(--left-panel-width) 1fr var(--right-panel-width);
-        gap: 20px;
-        padding: 20px;
+        /* Layout: Linke Leiste, linker Toggle, KARTE, rechter Toggle, rechte Leiste */
+        grid-template-columns: var(--left-panel-width) var(--toggle-btn-width) 1fr var(--toggle-btn-width) var(--right-panel-width);
+        gap: 0; /* Kein Abstand, da die Toggles direkt an den Rändern sitzen */
+        padding: 15px;
         flex-grow: 1;
         overflow: hidden;
         transition: grid-template-columns 0.35s ease-in-out;
@@ -65,32 +56,17 @@
 
     .panel {
         background: var(--text-light);
-        border: 1px solid var(--border-gray);
-        border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        transition: padding 0.35s ease-in-out, border 0.35s ease-in-out;
+        border: 1px solid var(--border-gray);
     }
+    #left-panel { border-radius: 12px 0 0 12px; }
+    #right-panel { border-radius: 0 12px 12px 0; }
 
-    .wrap.left-collapsed #left-panel,
-    .wrap.right-collapsed #right-panel {
-        padding: 0;
-        border: 0;
-    }
-
-    .panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px;
-        padding-bottom: 0;
-        flex-shrink: 0;
-    }
     .panel-content {
-        padding: 20px;
-        padding-top: 0;
+        padding: 0 20px 20px 20px;
         overflow-y: auto;
         flex-grow: 1;
         visibility: visible;
@@ -105,25 +81,29 @@
         transition: visibility 0s 0.2s, opacity 0.2s linear;
     }
     
-    .panel-toggle-btn {
-        background: transparent;
-        border: 1px solid var(--border-gray);
-        color: var(--text-muted);
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        cursor: pointer;
+    .toggle-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0;
-        font-size: 16px;
+        cursor: pointer;
+        background-color: #fff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
-    
+    #left-toggle-container { border-radius: 0 8px 8px 0; border: 1px solid var(--border-gray); border-left: none; }
+    #right-toggle-container { border-radius: 8px 0 0 8px; border: 1px solid var(--border-gray); border-right: none; }
+
+    .panel-toggle-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 14px;
+    }
+
     #map-container {
-        border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         overflow: hidden;
+        z-index: 100;
     }
 
     #map { height: 100%; width: 100%; }
@@ -134,9 +114,8 @@
         border-radius: 8px;
         border: 1px solid var(--border-gray);
         font-family: monospace;
-        font-size: 14px;
+        font-size: 12px;
         white-space: pre;
-        overflow: auto;
         resize: none;
         background-color: var(--code-bg);
         color: var(--text-light);
@@ -145,32 +124,32 @@
     
     label {
         display: block;
-        font-size: 14px;
+        font-size: 1.1rem;
         color: var(--text-muted);
-        margin-top: 16px;
-        margin-bottom: 6px;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
         font-weight: 600;
     }
 
     select, input[type="text"] {
         width: 100%;
-        padding: 10px 12px;
-        border-radius: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
         border: 1px solid var(--border-gray);
         background: #fff;
         color: var(--text-dark);
-        font-size: 16px;
+        font-size: 1.1rem;
         font-family: 'Inter', sans-serif;
     }
     
     button {
         appearance: none;
-        border-radius: 8px;
-        padding: 12px 16px;
+        border-radius: 6px;
+        padding: 10px 14px;
         font-weight: 600;
         cursor: pointer;
         font-family: 'Inter', sans-serif;
-        font-size: 16px;
+        font-size: 1.1rem;
         transition: all 0.2s ease-in-out;
     }
 
@@ -178,22 +157,30 @@
         background-color: var(--nextbike-light-blue);
         color: var(--text-light);
         border: none;
+        width: 100%;
     }
     
     .row {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        flex-wrap: wrap;
-        margin-top: 20px;
+        margin-top: 1.5rem;
+    }
+
+    .load-status {
+        margin-top: 1rem;
+        font-size: 1rem;
+        color: var(--text-muted);
+        background-color: var(--background-gray);
+        padding: 8px 12px;
+        border-radius: 6px;
+        text-align: center;
+        visibility: hidden;
     }
 
     .spinner {
-        border: 3px solid rgba(255,255,255,0.3);
-        border-top: 3px solid var(--text-light);
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top: 2px solid var(--text-light);
         border-radius: 50%;
-        width: 18px;
-        height: 18px;
+        width: 14px;
+        height: 14px;
         animation: spin 1s linear infinite;
         display: inline-block;
         vertical-align: middle;
@@ -204,17 +191,10 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Nextbike Stationskarte &amp; GeoJSON Viewer</h1>
-  </header>
-
   <div class="wrap" id="main-wrap">
     <section class="panel" id="left-panel">
-      <div class="panel-header">
-        <h3 style="margin:0; font-size: 18px;">Steuerung</h3>
-        <button id="toggle-left-panel" class="panel-toggle-btn" title="Seitenleiste einklappen">◀</button>
-      </div>
       <div class="panel-content">
+        <h3 style="margin-top:0; font-size: 1.5rem;">Steuerung</h3>
         <label for="countrySelect">1) Land wählen</label>
         <select id="countrySelect"></select>
 
@@ -230,30 +210,30 @@
         <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
         
         <div class="row">
-          <button class="primary" id="loadBtn"><span id="loadIcon"></span>🔄 Stationen laden</button>
+          <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
         </div>
-
-        <div class="status-bar" id="status" style="margin-top:12px; font-size: 14px;">Lade Listen…</div>
+        <div class="load-status" id="load-status">Initialisiere...</div>
       </div>
     </section>
+
+    <div class="toggle-container" id="left-toggle-container">
+        <button id="toggle-left-panel" class="panel-toggle-btn" title="Steuerung einklappen">◀</button>
+    </div>
 
     <section id="map-container">
       <div id="map"></div>
     </section>
 
+    <div class="toggle-container" id="right-toggle-container">
+        <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
+    </div>
+
     <section class="panel" id="right-panel">
-        <div class="panel-header">
-            <h3 style="margin:0; font-size: 18px;">GeoJSON</h3>
-            <button id="toggle-right-panel" class="panel-toggle-btn" title="Seitenleiste einklappen">▶</button>
-        </div>
-        <div class="panel-content" style="display: flex; flex-direction: column;">
+        <div class="panel-content" style="display: flex; flex-direction: column; padding-top: 20px;">
+            <label for="geojson-output" style="margin-top:0;">GeoJSON der angezeigten Stationen</label>
             <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
             <div class="row">
-                <button class="primary" id="geojsonBtn" disabled>⬇️ GeoJSON Datei herunterladen</button>
-            </div>
-            <div style="margin-top: auto; padding-top:20px; display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Stationen: <strong id="countStations">–</strong></div>
-                <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Geladen: <strong id="lastUpdated">–</strong></div>
+                <button class="primary" id="geojsonBtn" disabled>GeoJSON Datei herunterladen</button>
             </div>
         </div>
     </section>
@@ -264,7 +244,6 @@
 
   <script>
     const $ = sel => document.querySelector(sel);
-    const status = msg => { $('#status').textContent = msg; };
 
     let map, layer, currentGeoJSON = null;
     let countryList = [], rawCountries = [], brandList = [];
@@ -321,7 +300,8 @@
     }
 
     async function loadLists(){
-      status('Systeme werden geladen...');
+      $('#load-status').style.visibility = 'visible';
+      $('#load-status').textContent = 'Systeme werden geladen...';
       try{
         const resp = await fetch('https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0', { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -337,9 +317,9 @@
         countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
         
         refreshBrandSelect();
-        status('Bitte Auswahl treffen und Stationen laden.');
+        $('#load-status').textContent = 'Bitte Auswahl treffen.';
       }catch(e){
-        status('Fehler beim Laden der System-Listen: ' + e.message);
+        $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
         alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
       }
     }
@@ -397,16 +377,9 @@
               type:'Feature', 
               geometry:{ type:'Point', coordinates:[place.lng, place.lat] }, 
               properties: {
-                station_id: String(place.number ?? place.uid ?? ''),
-                name: place.name || '',
-                address: place.address || '',
-                capacity: place.bike_racks ?? null,
-                num_bikes_available: place.bikes ?? null,
-                num_docks_available: place.free_racks ?? null,
-                city_uid: city.uid ?? null,
-                city_name: city.name || city.city || city.alias || '',
-                domain,
-                country_name: country.country_name || ''
+                station_id: String(place.number ?? place.uid ?? ''), name: place.name || '', address: place.address || '',
+                capacity: place.bike_racks ?? null, num_bikes_available: place.bikes ?? null, num_docks_available: place.free_racks ?? null,
+                city_uid: city.uid ?? null, city_name: city.name || city.city || city.alias || '', domain, country_name: country.country_name || ''
               }
             });
           });
@@ -419,7 +392,7 @@
       const loadBtn = $('#loadBtn');
       loadBtn.disabled = true;
       $('#loadIcon').innerHTML = '<span class="spinner"></span>';
-      status('Lade Stationen…');
+      $('#load-status').textContent = 'Lade Stationen...';
       
       try{
         const domain = $('#brandSelect').value, cityUid = $('#citySelect').value;
@@ -440,8 +413,10 @@
         }
 
         currentGeoJSON = fc;
-        $('#countStations').textContent = fc.features.length;
-        $('#lastUpdated').textContent = new Date().toLocaleString('de-DE');
+        const stationCount = fc.features.length;
+        const timestamp = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
+        $('#load-status').innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
+
         $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
         if(fc.features.length > 0){ 
@@ -449,9 +424,8 @@
             if(bounds.isValid()) map.fitBounds(bounds, {padding: [50, 50]}); 
         }
         $('#geojsonBtn').disabled = fc.features.length === 0;
-        status(`Fertig. ${fc.features.length} Stationen geladen.`);
       }catch(e){ 
-          status('Fehler: '+e.message); 
+          $('#load-status').textContent = 'Fehler: '+e.message; 
           $('#geojsonBtn').disabled = true; 
       }
       finally{ 
@@ -463,11 +437,10 @@
     function downloadGeoJSON(){ 
       if(!currentGeoJSON) return; 
       const name = ($('#fileBase').value || 'nextbike_stations').replace(/[\W_]+/g,"_"); 
-      const blob = new Blob([JSON.stringify(currentGeoJSON,null,2)], {type:'application/geo+json;charset=utf-8'}); 
+      const blob = new Blob([$('#geojson-output').value], {type:'application/geo+json;charset=utf-8'}); 
       saveAs(blob, name + '.geojson'); 
     }
     
-    // --- NEU: Logik zum Ein- und Ausklappen der Seitenleisten ---
     function setupSidebars() {
         const wrap = $('#main-wrap');
         const toggleLeftBtn = $('#toggle-left-panel');
@@ -476,21 +449,20 @@
         toggleLeftBtn.addEventListener('click', () => {
             wrap.classList.toggle('left-collapsed');
             toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
-            // Sage der Karte, dass sie ihre Größe neu berechnen soll, nachdem die Animation abgeschlossen ist.
-            setTimeout(() => map.invalidateSize(), 350); 
+            setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350); 
         });
 
         toggleRightBtn.addEventListener('click', () => {
             wrap.classList.toggle('right-collapsed');
             toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
-            setTimeout(() => map.invalidateSize(), 350);
+            setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
         });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
       loadLists();
-      setupSidebars(); // Neue Funktion aufrufen
+      setupSidebars();
       $('#countrySelect').addEventListener('change', refreshBrandSelect);
       $('#brandSelect').addEventListener('change', refreshCitySelect);
       $('#loadBtn').addEventListener('click', loadData);
