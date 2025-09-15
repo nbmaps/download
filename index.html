@@ -376,7 +376,17 @@
       });
       
       flexzoneLayer = L.geoJSON(null, {
-          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 },
+          style: function(feature) {
+              const category = feature.properties.category;
+              if (category === 'free_return') {
+                  return { color: '#000000', weight: 1, opacity: 1, fillColor: '#000000', fillOpacity: 0.2 };
+              }
+              if (category === 'chargeable_return') {
+                  return { color: '#FFA500', weight: 1, opacity: 1, fillColor: '#FFFF00', fillOpacity: 0.25 };
+              }
+              // Default style
+              return { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 };
+          },
           onEachFeature: (f, l) => {
               if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`);
           }
@@ -477,6 +487,8 @@
       selectedBrandDomain = null;
       brandInput.disabled = false;
       brandInput.placeholder = `${availableBrands.length} Marken/Systeme verfügbar...`;
+      
+      $('#flexzone-toggle-container').classList.add('hidden');
       refreshCitySelect();
     }
 
@@ -682,6 +694,20 @@
       setupSidebars();
       setupBrandSearch();
       $('#loadBtn').addEventListener('click', loadData);
+      $('#geojsonBtn').addEventListener('click', () => {
+        if(!currentGeoJSON) return; 
+        const name = ($('#fileBase').value || 'nextbike_stations').replace(/[\W_]+/g,"_"); 
+        const blob = new Blob([$('#geojson-output').value], {type:'application/geo+json;charset=utf-8'}); 
+        saveAs(blob, name + '.geojson'); 
+      });
+
+      $('#flexzonesCheckbox').addEventListener('change', (e) => {
+          if (e.target.checked) {
+              map.addLayer(flexzoneLayer);
+          } else {
+              map.removeLayer(flexzoneLayer);
+          }
+      });
     });
   </script>
 </body>
