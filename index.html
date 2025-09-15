@@ -3,14 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nextbike Stationskarte &amp; Export</title>
+  <title>Nextbike Stationskarte & GeoJSON Viewer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   
   <style>
-    /* Import der empfohlenen Schriftart von Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-    /* Definition der Farbpalette basierend auf der Nextbike CI */
     :root {
         --nextbike-dark-blue: #003A5D;
         --nextbike-light-blue: #0098FF;
@@ -19,20 +17,20 @@
         --text-dark: #212529;
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
+        --code-bg: #212529;
     }
 
-    * {
-        box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
-        font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
+        font-family: 'Inter', system-ui, sans-serif;
         background-color: var(--background-gray);
         color: var(--text-dark);
         margin: 0;
         display: flex;
         flex-direction: column;
-        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
     }
 
     header {
@@ -41,6 +39,7 @@
         padding: 16px 24px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         z-index: 1000;
+        flex-shrink: 0;
     }
 
     h1 {
@@ -52,10 +51,11 @@
     
     .wrap {
         display: grid;
-        grid-template-columns: 480px 1fr;
+        grid-template-columns: 420px 1fr 420px; /* Dreispaltiges Layout */
         gap: 20px;
         padding: 20px;
         flex-grow: 1;
+        overflow: hidden;
     }
 
     .panel {
@@ -65,17 +65,37 @@
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
     }
     
     #map-container {
         border-radius: 12px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        overflow: hidden; /* Stellt sicher, dass die Karte innerhalb der abgerundeten Ecken bleibt */
+        overflow: hidden;
     }
 
-    #map {
-        height: 100%;
+    #map { height: 100%; width: 100%; }
+
+    #geojson-viewer {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    #geojson-output {
         width: 100%;
+        flex-grow: 1;
+        border-radius: 8px;
+        border: 1px solid var(--border-gray);
+        font-family: monospace;
+        font-size: 14px;
+        white-space: pre;
+        overflow: auto;
+        resize: none;
+        background-color: var(--code-bg);
+        color: var(--text-light);
+        padding: 12px;
     }
 
     label {
@@ -97,10 +117,6 @@
         font-family: 'Inter', sans-serif;
     }
     
-    input[type="text"]::placeholder {
-        color: #adb5bd;
-    }
-
     button {
         appearance: none;
         border-radius: 8px;
@@ -119,27 +135,9 @@
     }
     
     button.primary:hover {
-        background-color: #007fdb; /* Etwas dunkler beim Hover */
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 152, 255, 0.2);
+        background-color: #007fdb;
     }
     
-    button.ghost {
-        background-color: transparent;
-        color: var(--nextbike-light-blue);
-        border: 2px solid var(--nextbike-light-blue);
-    }
-
-    button.ghost:hover {
-        background-color: var(--nextbike-light-blue);
-        color: var(--text-light);
-    }
-    
-    button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
     .row {
         display: flex;
         gap: 12px;
@@ -154,36 +152,8 @@
         gap: 12px;
     }
 
-    .hint {
-        font-size: 12px;
-        color: var(--text-muted);
-    }
-    
-    .status-bar {
-        margin-top: 12px;
-        font-size: 14px;
-    }
-
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: var(--background-gray);
-        border: 1px solid var(--border-gray);
-        color: var(--text-dark);
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 14px;
-    }
-    
-    hr {
-        border: none;
-        border-top: 1px solid var(--border-gray);
-        margin: 20px 0;
-    }
-    
     .spinner {
-        border: 3px solid rgba(0,0,0,0.1);
+        border: 3px solid rgba(255,255,255,0.3);
         border-top: 3px solid var(--text-light);
         border-radius: 50%;
         width: 18px;
@@ -195,20 +165,11 @@
     }
 
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
-    
-    footer {
-        text-align: center;
-        padding: 20px;
-        font-size: 14px;
-        color: var(--text-muted);
-        background-color: var(--text-light);
-        border-top: 1px solid var(--border-gray);
-    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Nextbike Stationskarte &amp; Export</h1>
+    <h1>Nextbike Stationskarte &amp; GeoJSON Viewer</h1>
   </header>
 
   <div class="wrap">
@@ -222,42 +183,34 @@
       <label for="citySelect">3) Stadt filtern (optional)</label>
       <select id="citySelect" disabled></select>
 
-      <hr>
+      <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
 
-      <div class="grid">
-        <div>
-          <label for="fileBase">Dateiname</label>
-          <input id="fileBase" type="text" value="nextbike_stations" />
-        </div>
-        <div>
-          <label for="quickFilter">Schnellfilter</label>
-          <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
-        </div>
-      </div>
+      <label for="quickFilter">Schnellfilter</label>
+      <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
       
       <div class="row">
         <button class="primary" id="loadBtn"><span id="loadIcon"></span>🔄 Stationen laden</button>
-        <button class="ghost" id="geojsonBtn" disabled>⬇️ GeoJSON</button>
       </div>
 
-      <div class="status-bar" id="status">Lade Listen…</div>
-
-      <hr>
-
-      <div class="grid">
-        <div class="badge">Stationen: <strong id="countStations">–</strong></div>
-        <div class="badge">Zuletzt geladen: <strong id="lastUpdated">–</strong></div>
-      </div>
+      <div class="status-bar" id="status" style="margin-top:12px; font-size: 14px;">Lade Listen…</div>
     </section>
 
     <section id="map-container">
       <div id="map"></div>
     </section>
-  </div>
 
-  <footer>
-    Ein Projekt zur Visualisierung und zum Export von Nextbike-Stationsdaten.
-  </footer>
+    <section class="panel" id="geojson-viewer">
+        <label for="geojson-output">GeoJSON der angezeigten Stationen</label>
+        <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code nach dem Laden der Stationen..."></textarea>
+        <div class="row">
+            <button class="primary" id="geojsonBtn" disabled>⬇️ GeoJSON Datei herunterladen</button>
+        </div>
+         <div class="grid" style="margin-top: auto; padding-top:20px;">
+            <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Stationen: <strong id="countStations">–</strong></div>
+            <div class="badge" style="background: var(--background-gray); border: 1px solid var(--border-gray);">Zuletzt geladen: <strong id="lastUpdated">–</strong></div>
+        </div>
+    </section>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
@@ -267,15 +220,13 @@
     const status = msg => { $('#status').textContent = msg; };
 
     let map, layer, currentGeoJSON = null;
-    let countryList = [];
-    let rawCountries = [];
-    let brandList = [];
+    let countryList = [], rawCountries = [], brandList = [];
     const brandCitiesCache = new Map();
 
     function initMap(){
       map = L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'&copy; OpenStreetMap' }).addTo(map);
-      map.setView([51.1657, 10.4515], 6); // Angepasster Zoom für Deutschland-Fokus
+      map.setView([51.1657, 10.4515], 6);
       layer = L.geoJSON(null, {
         onEachFeature: (f, l) => {
           const p = f.properties || {};
@@ -291,70 +242,43 @@
 
     function dedupeCountries(countriesIn){
       const mapC = new Map();
-      for(const c of countriesIn){
+      countriesIn.forEach(c => {
         const code = (c.country || c.country_code || '').toUpperCase();
         const name = c.country_name || '';
-        if(name && code){
-            const key = code || name;
-            if(!mapC.has(key)) mapC.set(key, { country_code: code, country_name: name });
-        }
-      }
+        if(name && code && !mapC.has(code)) mapC.set(code, { country_code: code, country_name: name });
+      });
       let arr = Array.from(mapC.values());
-      arr.sort((a,b)=>{ if(a.country_name==='Germany') return -1; if(b.country_name==='Germany') return 1; return (a.country_name||'').localeCompare(b.country_name||''); });
+      arr.sort((a,b) => (a.country_name==='Germany' ? -1 : b.country_name==='Germany' ? 1 : (a.country_name||'').localeCompare(b.country_name||'')));
       return arr;
     }
 
     function buildBrands(dataCountries) {
         const mapB = new Map();
-        for (const topLevelObject of dataCountries) {
+        dataCountries.forEach(topLevelObject => {
             const geo_country_code = (topLevelObject.country || '').toUpperCase();
-            const geo_country_name = topLevelObject.country_name || '';
-
-            const topLevelDomain = (topLevelObject.domain || '').toLowerCase();
-            if (topLevelDomain) {
-                const name = topLevelObject.name || `System ${topLevelDomain}`;
-                if (!mapB.has(topLevelDomain)) {
-                    mapB.set(topLevelDomain, {
-                        key: topLevelDomain, domain: topLevelDomain, name: name,
-                        country_codes: new Set(), country_names: new Set()
-                    });
+            const processEntity = (entity, nameFallback) => {
+                const domain = (entity.domain || '').toLowerCase();
+                if (!domain) return;
+                const name = entity.name || entity.alias || nameFallback || `System ${domain}`;
+                if (!mapB.has(domain)) {
+                    mapB.set(domain, { key: domain, domain, name, country_codes: new Set() });
                 }
-                const entry = mapB.get(topLevelDomain);
-                if (geo_country_code) entry.country_codes.add(geo_country_code);
-                if (geo_country_name) entry.country_names.add(geo_country_name);
+                if (geo_country_code) mapB.get(domain).country_codes.add(geo_country_code);
+            };
+            processEntity(topLevelObject);
+            if (topLevelObject.cities) {
+                topLevelObject.cities.forEach(city => processEntity(city, city.city));
             }
-
-            if (topLevelObject.cities && topLevelObject.cities.length > 0) {
-                for (const city of topLevelObject.cities) {
-                    const cityDomain = (city.domain || '').toLowerCase();
-                    if (!cityDomain) continue;
-
-                    const name = city.name || city.alias || `System ${cityDomain}`;
-                    if (!mapB.has(cityDomain)) {
-                        mapB.set(cityDomain, {
-                            key: cityDomain, domain: cityDomain, name: name,
-                            country_codes: new Set(), country_names: new Set()
-                        });
-                    }
-                    const entry = mapB.get(cityDomain);
-                    if (geo_country_code) entry.country_codes.add(geo_country_code);
-                    if (geo_country_name) entry.country_names.add(geo_country_name);
-                }
-            }
-        }
-        const brands = Array.from(mapB.values());
-        brands.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        return brands;
+        });
+        return Array.from(mapB.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }
 
     async function loadLists(){
       status('Systeme werden geladen...');
       try{
-        const url = 'https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0';
-        const resp = await fetch(url, { cache: 'no-store' });
+        const resp = await fetch('https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0', { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        
         if (!data || !data.countries) throw new Error("API-Antwort ist ungültig.");
 
         rawCountries = data.countries;
@@ -363,49 +287,39 @@
 
         const cSel = $('#countrySelect'); cSel.innerHTML = '';
         cSel.appendChild(option('', 'Alle Länder (weltweit)'));
-        for(const c of countryList){ cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)); }
-        cSel.value = '';
-
+        countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
+        
         refreshBrandSelect();
         status('Bitte Auswahl treffen und Stationen laden.');
       }catch(e){
-        console.error(e);
-        const errorMsg = 'Fehler beim Laden der System-Listen: ' + e.message;
-        status(errorMsg);
-        alert(errorMsg + '\n\nBitte Internetverbindung prüfen und Seite neu laden.');
+        status('Fehler beim Laden der System-Listen: ' + e.message);
+        alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
       }
     }
 
     function refreshBrandSelect(){
-      const selValRaw = $('#countrySelect').value || '';
-      const countryCode = selValRaw.toUpperCase();
+      const countryCode = ($('#countrySelect').value || '').toUpperCase();
       const bSel = $('#brandSelect');
-      let list = brandList;
-      if(selValRaw){
-        list = brandList.filter(b => b.country_codes.has(countryCode));
-      }
-      bSel.innerHTML='';
-      bSel.appendChild(option('', selValRaw ? 'Alle Marken im Land' : 'Alle Marken (weltweit)'));
-      for(const b of list){ bSel.appendChild(option(b.key, `${b.name} · ${b.domain}`)); }
+      let list = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
+      
+      bSel.innerHTML = '';
+      bSel.appendChild(option('', countryCode ? 'Alle Marken im Land' : 'Alle Marken (weltweit)'));
+      list.forEach(b => bSel.appendChild(option(b.key, `${b.name} · ${b.domain}`)));
       bSel.disabled = false;
       refreshCitySelect();
     }
 
     async function fetchCitiesForBrand(domain){
       if(brandCitiesCache.has(domain)) return brandCitiesCache.get(domain);
-      const url = `https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
-      const resp = await fetch(url, { cache: 'no-store' });
+      const resp = await fetch(`https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`, { cache: 'no-store' });
       if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const out = [];
-      for(const co of (data.countries||[])){
+      data.countries?.forEach(co => {
         const cc = (co.country || co.country_code || '').toUpperCase();
-        for(const city of (co.cities||[])){
-          out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc });
-        }
-      }
-      const seen = new Set();
-      const deduped = out.filter(x=>{ if(seen.has(x.uid)) return false; seen.add(x.uid); return true; });
+        co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
+      });
+      const deduped = [...new Map(out.map(item => [item.uid, item])).values()];
       brandCitiesCache.set(domain, deduped);
       return deduped;
     }
@@ -414,69 +328,59 @@
       const brandKey = $('#brandSelect').value;
       const citySel = $('#citySelect');
       const countryCode = ($('#countrySelect').value || '').toUpperCase();
-      citySel.innerHTML='';
-      citySel.appendChild(option('', '[optional] Alle Städte im System'));
+      citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
       if(!brandKey){ citySel.disabled = true; return; }
       try{
         let items = await fetchCitiesForBrand(brandKey);
-        if(countryCode) items = items.filter(c => (c.country_code||'').toUpperCase()===countryCode);
+        if(countryCode) items = items.filter(c => (c.country_code||'') === countryCode);
         items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
-        for(const c of items){ citySel.appendChild(option(String(c.uid), c.name)); }
+        items.forEach(c => citySel.appendChild(option(String(c.uid), c.name)));
         citySel.disabled = false;
       }catch(e){ console.error(e); citySel.disabled = true; }
     }
 
     function fcFromNextbike(json){
       const features = [];
-      for(const country of (json.countries||[])){
-        for(const city of (country.cities||[])){
+      json.countries?.forEach(country => {
+        country.cities?.forEach(city => {
           const domain = city.domain || '';
-          for(const place of (city.places||[])){
-            const lat = place.lat, lon = place.lng;
-            if(typeof lat !== 'number' || typeof lon !== 'number') continue;
-            const props = {
-              station_id: String(place.number ?? place.uid ?? ''),
-              name: place.name || '',
-              address: place.address || '',
-              capacity: place.bike_racks ?? null,
-              num_bikes_available: place.bikes ?? null,
-              num_docks_available: place.free_racks ?? null,
-              city_uid: city.uid ?? null,
-              city_name: city.name || city.city || city.alias || '',
-              domain,
-              country_name: country.country_name || ''
-            };
-            features.push({ type:'Feature', geometry:{ type:'Point', coordinates:[lon, lat] }, properties: props });
-          }
-        }
-      }
+          city.places?.forEach(place => {
+            if(typeof place.lat !== 'number' || typeof place.lng !== 'number') return;
+            features.push({ 
+              type:'Feature', 
+              geometry:{ type:'Point', coordinates:[place.lng, place.lat] }, 
+              properties: {
+                station_id: String(place.number ?? place.uid ?? ''),
+                name: place.name || '',
+                address: place.address || '',
+                capacity: place.bike_racks ?? null,
+                num_bikes_available: place.bikes ?? null,
+                num_docks_available: place.free_racks ?? null,
+                city_uid: city.uid ?? null,
+                city_name: city.name || city.city || city.alias || '',
+                domain,
+                country_name: country.country_name || ''
+              }
+            });
+          });
+        });
+      });
       return { type:'FeatureCollection', features };
     }
     
     async function loadData(){
       const loadBtn = $('#loadBtn');
-      const loadIcon = $('#loadIcon');
       loadBtn.disabled = true;
-      loadIcon.innerHTML = '<span class="spinner"></span>';
+      $('#loadIcon').innerHTML = '<span class="spinner"></span>';
       status('Lade Stationen…');
       
       try{
+        const domain = $('#brandSelect').value, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
-        const domain = $('#brandSelect').value;
-        const cityUid = $('#citySelect').value;
-        let url;
-
-        if(domain){
-            if(cityUid){
-                url = `https://maps.nextbike.net/maps/nextbike-official.json?city=${encodeURIComponent(cityUid)}&bikes=0`;
-            } else {
-                url = `https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
-            }
-        } else if(countryCode){
-            url = `https://maps.nextbike.net/maps/nextbike-official.json?countries=${encodeURIComponent(countryCode)}&bikes=0`;
-        } else {
-            url = `https://maps.nextbike.net/maps/nextbike-official.json?bikes=0`;
-        }
+        let url = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
+        if(cityUid) url += `&city=${cityUid}`;
+        else if(domain) url += `&domains=${domain}`;
+        else if(countryCode) url += `&countries=${countryCode}`;
 
         const resp = await fetch(url, { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -485,15 +389,13 @@
 
         const filterTxt = ($('#quickFilter').value||'').trim().toLowerCase();
         if(filterTxt){
-          fc = { type:'FeatureCollection', features: fc.features.filter(f => {
-            const p = f.properties || {}; const s = `${p.name} ${p.address}`.toLowerCase();
-            return s.includes(filterTxt);
-          })};
+          fc.features = fc.features.filter(f => `${f.properties.name} ${f.properties.address}`.toLowerCase().includes(filterTxt));
         }
 
         currentGeoJSON = fc;
         $('#countStations').textContent = fc.features.length;
         $('#lastUpdated').textContent = new Date().toLocaleString('de-DE');
+        $('#geojson-output').value = JSON.stringify(fc, null, 2); // GeoJSON im Textfeld anzeigen
         layer.clearLayers().addData(fc);
         if(fc.features.length > 0){ 
             const bounds = L.geoJSON(fc).getBounds(); 
@@ -502,28 +404,27 @@
         $('#geojsonBtn').disabled = fc.features.length === 0;
         status(`Fertig. ${fc.features.length} Stationen geladen.`);
       }catch(e){ 
-          console.error(e); 
           status('Fehler: '+e.message); 
           $('#geojsonBtn').disabled = true; 
       }
       finally{ 
           loadBtn.disabled = false; 
-          loadIcon.innerHTML = '';
+          $('#loadIcon').innerHTML = '';
       }
     }
 
     function downloadGeoJSON(){ 
       if(!currentGeoJSON) return; 
-      const name = ($('#fileBase').value || 'nextbike_stations').replace(/[^A-Za-z0-9_\-]/g,'_'); 
-      const blob = new Blob([JSON.stringify(currentGeoJSON,null,2)], {type:'application/geo+json'}); 
+      const name = ($('#fileBase').value || 'nextbike_stations').replace(/[\W_]+/g,"_"); 
+      const blob = new Blob([JSON.stringify(currentGeoJSON,null,2)], {type:'application/geo+json;charset=utf-8'}); 
       saveAs(blob, name + '.geojson'); 
     }
     
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
       loadLists();
-      $('#countrySelect').addEventListener('change', () => { refreshBrandSelect(); });
-      $('#brandSelect').addEventListener('change', () => { refreshCitySelect(); });
+      $('#countrySelect').addEventListener('change', refreshBrandSelect);
+      $('#brandSelect').addEventListener('change', refreshCitySelect);
       $('#loadBtn').addEventListener('click', loadData);
       $('#geojsonBtn').addEventListener('click', downloadGeoJSON);
     });
