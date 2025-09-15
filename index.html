@@ -329,7 +329,7 @@
     let flexzoneLayer;
     let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
     let selectedBrandDomain = null;
-    let allFlexzones = []; // Cache für alle Flexzonen
+    let allFlexzones = []; 
 
     const nextbikeIcon = L.icon({
         iconUrl: 'marker_nbblue.png',
@@ -470,13 +470,35 @@
       refreshCitySelect();
     }
 
+    async function fetchCitiesForBrand(domain){
+      if(brandCitiesCache.has(domain)) return brandCitiesCache.get(domain);
+      const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
+      const resp = await fetch(url, { cache: 'no-store' });
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const out = [];
+      data.countries?.forEach(co => {
+        const cc = (co.country || co.country_code || '').toUpperCase();
+        co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
+      });
+      const deduped = [...new Map(out.map(item => [item.uid, item])).values()];
+      brandCitiesCache.set(domain, deduped);
+      return deduped;
+    }
+
     async function refreshCitySelect(){
       const brandKey = selectedBrandDomain;
       const citySel = $('#citySelect');
+      const countryCode = ($('#countrySelect').value || '').toUpperCase();
       citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
       if(!brandKey){ citySel.disabled = true; return; }
-      
-      citySel.disabled = true;
+      try{
+        let items = await fetchCitiesForBrand(brandKey);
+        if(countryCode) items = items.filter(c => (c.country_code||'') === countryCode);
+        items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+        items.forEach(c => citySel.appendChild(option(String(c.uid), c.name)));
+        citySel.disabled = false;
+      }catch(e){ console.error(e); citySel.disabled = true; }
     }
 
     function fcFromNextbike(json){
@@ -508,15 +530,12 @@
       $('#load-status').textContent = 'Lade Stationen...';
       
       try{
-        const domain = selectedBrandDomain;
+        const domain = selectedBrandDomain, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
-        
         let baseUrl = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
-        if(domain) {
-            baseUrl += `&domains=${domain}`;
-        } else if (countryCode) {
-            baseUrl += `&countries=${countryCode}`;
-        }
+        if(cityUid) baseUrl += `&city=${cityUid}`;
+        else if(domain) baseUrl += `&domains=${domain}`;
+        else if(countryCode) baseUrl += `&countries=${countryCode}`;
 
         const resp = await fetch(`${corsProxy}${baseUrl}`, { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -624,6 +643,7 @@
                         brandInput.value = system.name;
                         selectedBrandDomain = system.domain;
                         brandResults.style.display = 'none';
+                        refreshCitySelect();
                     });
                     brandResults.appendChild(item);
                 });
@@ -651,7 +671,7 @@
       loadLists();
       setupSidebars();
       setupBrandSearch();
-      //$('#countrySelect').addEventListener('change', updateAvailableBrands); // Wird jetzt von setupBrandSearch gehandhabt
+      //$('#countrySelect').addEventListener('change', updateAvailableBrands); 
       $('#loadBtn').addEventListener('click', loadData);
     });
   </script>
