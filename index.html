@@ -5,24 +5,31 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Nextbike Stationskarte & GeoJSON Viewer</title>
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
     :root {
-        --nextbike-blue: #0098FF;
+        --nextbike-dark-blue: #003A5D;
+        --nextbike-light-blue: #0098FF;
         --background-gray: #F5F7FA;
         --border-gray: #DEE2E6;
         --text-dark: #212529;
         --text-muted: #6C757D;
         --text-light: #FFFFFF;
-        --panel-width: 400px;
-        --toggle-width: 24px;
+        --code-bg: #212529;
+        --left-panel-width: 380px;
+        --right-panel-width: 380px;
+        --toggle-btn-width: 24px;
     }
-    html { font-size: 85%; }
+
+    html {
+        font-size: 85%;
+    }
+
     * { box-sizing: border-box; }
+
     body {
         font-family: 'Inter', system-ui, sans-serif;
         background-color: var(--background-gray);
@@ -33,34 +40,35 @@
         height: 100vh;
         overflow: hidden;
     }
-    .main-container {
+    
+    .wrap {
         display: grid;
-        grid-template-columns: var(--panel-width) var(--toggle-width) 1fr;
+        grid-template-columns: var(--left-panel-width) var(--toggle-btn-width) 1fr var(--toggle-btn-width) var(--right-panel-width);
+        gap: 0;
+        padding: 0;
         flex-grow: 1;
         overflow: hidden;
         transition: grid-template-columns 0.35s ease-in-out;
     }
-    .main-container.panel-collapsed { --panel-width: 0px; }
+
+    .wrap.left-collapsed { --left-panel-width: 0px; }
+    .wrap.right-collapsed { --right-panel-width: 0px; }
 
     .panel {
         background: var(--text-light);
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        border-right: 1px solid var(--border-gray);
+        border: none;
+        border-radius: 0;
     }
+    #left-panel { border-right: 1px solid var(--border-gray); }
+    #right-panel { border-left: 1px solid var(--border-gray); }
+
     .panel-content {
         padding: 20px;
         overflow-y: auto;
         flex-grow: 1;
-        visibility: visible;
-        opacity: 1;
-        transition: visibility 0s, opacity 0.2s linear;
-    }
-    .main-container.panel-collapsed .panel-content {
-        visibility: hidden;
-        opacity: 0;
-        transition: visibility 0s 0.2s, opacity 0.2s linear;
     }
     
     .toggle-container {
@@ -69,77 +77,211 @@
         justify-content: center;
         cursor: pointer;
         background-color: #fff;
-        border-right: 1px solid var(--border-gray);
+        border-top: 1px solid var(--border-gray);
+        border-bottom: 1px solid var(--border-gray);
     }
-    
+    #left-toggle-container { border-right: 1px solid var(--border-gray); }
+    #right-toggle-container { border-left: 1px solid var(--border-gray); }
+
     .panel-toggle-btn {
-        background: transparent; border: none;
-        color: var(--text-muted); cursor: pointer; font-size: 14px;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 14px;
     }
 
-    #map { height: 100%; width: 100%; z-index: 100; }
+    #map-container {
+        overflow: hidden;
+        z-index: 100;
+    }
+
+    #map { height: 100%; width: 100%; }
+    
+    #geojson-output {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+        border: 1px solid var(--border-gray);
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre;
+        resize: none;
+        background-color: var(--text-light);
+        color: var(--text-dark);
+        padding: 12px;
+    }
     
     label {
-        display: block; font-size: 1.1rem; color: var(--text-muted);
-        margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 600;
+        display: block;
+        font-size: 1.1rem;
+        color: var(--text-muted);
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
     }
-    input[type="text"] {
-        width: 100%; padding: 8px 10px; border-radius: 0;
-        border: 1px solid var(--border-gray); background: #fff;
-        color: var(--text-dark); font-size: 1.1rem; font-family: 'Inter', sans-serif;
+
+    select, input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 0;
+        border: 1px solid var(--border-gray);
+        background: #fff;
+        color: var(--text-dark);
+        font-size: 1.1rem;
+        font-family: 'Inter', sans-serif;
     }
     
     button {
-        appearance: none; border-radius: 0; padding: 10px 14px;
-        font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
-        font-size: 1.1rem; transition: all 0.2s ease-in-out;
+        appearance: none;
+        border-radius: 0;
+        padding: 10px 14px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        font-size: 1.1rem;
+        transition: all 0.2s ease-in-out;
     }
+
     button.primary {
-        background-color: var(--nextbike-blue); color: var(--text-light);
-        border: none; width: 100%;
+        background-color: var(--nextbike-light-blue);
+        color: var(--text-light);
+        border: none;
+        width: 100%;
     }
-    .row { margin-top: 1.5rem; }
     
+    .row {
+        margin-top: 1.5rem;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
     .load-status {
-        margin-top: 1rem; font-size: 1rem; color: var(--text-muted);
-        background-color: var(--background-gray); padding: 8px 12px;
-        border-radius: 0; text-align: center;
+        margin-top: 1rem;
+        font-size: 1rem;
+        color: var(--text-muted);
+        background-color: var(--background-gray);
+        padding: 8px 12px;
+        border-radius: 0;
+        text-align: center;
+        visibility: hidden;
     }
     
-    .autocomplete-container { position: relative; }
-    .autocomplete-results {
-        position: absolute; top: 100%; left: 0; right: 0;
-        background: var(--text-light); border: 1px solid var(--border-gray);
-        border-top: none; max-height: 300px; overflow-y: auto;
-        z-index: 1001; display: none;
+    .autocomplete-container {
+        position: relative;
     }
-    .autocomplete-item { padding: 8px 12px; cursor: pointer; }
-    .autocomplete-item:hover { background-color: var(--nextbike-blue); color: var(--text-light); }
+    .autocomplete-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--text-light);
+        border: 1px solid var(--border-gray);
+        border-top: none;
+        border-radius: 0;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1001;
+        display: none;
+    }
+    .autocomplete-item {
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active {
+        background-color: var(--nextbike-light-blue);
+        color: var(--text-light);
+    }
+    .autocomplete-item small {
+        color: var(--text-muted);
+        margin-left: 8px;
+    }
+    .autocomplete-item:hover small, .autocomplete-item.active small {
+        color: var(--text-light);
+    }
+
+    .label-emphasized {
+        color: var(--text-dark);
+        font-weight: 700;
+    }
+    .label-de-emphasized {
+        opacity: 0.7;
+        font-weight: 400;
+    }
+    #brandInput {
+        border: 2px solid var(--nextbike-dark-blue);
+        padding: 7px 9px;
+    }
+    #brandInput:focus {
+        outline: none;
+        border-color: var(--nextbike-light-blue);
+        box-shadow: 0 0 0 3px rgba(0, 152, 255, 0.2);
+    }
 
     .spinner {
         border: 2px solid rgba(255,255,255,0.3);
         border-top: 2px solid var(--text-light);
-        border-radius: 50%; width: 14px; height: 14px;
-        animation: spin 1s linear infinite; display: inline-block;
-        vertical-align: middle; margin-right: 6px;
+        border-radius: 50%;
+        width: 14px;
+        height: 14px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
     }
+    
     .checkbox-container {
-        display: flex; align-items: center; margin-top: 1rem;
-        padding: 8px; background-color: var(--background-gray);
+        display: flex;
+        align-items: center;
+        margin-top: 1rem;
+        padding: 8px;
+        background-color: var(--background-gray);
     }
-    .checkbox-container input { width: auto; margin-right: 8px; }
-    .checkbox-container label { margin: 0; font-weight: 400; color: var(--text-dark); font-size: 1.1rem; }
+    .checkbox-container input {
+        width: auto;
+        margin-right: 8px;
+    }
+    .checkbox-container label {
+        margin: 0;
+        font-weight: 400;
+        color: var(--text-dark);
+        font-size: 1.1rem;
+    }
+
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
-  <div class="main-container" id="main-container">
+  <div class="wrap" id="main-wrap">
     <section class="panel" id="left-panel">
       <div class="panel-content">
-        <label for="systemInput">System suchen</label>
+        <label for="countrySelect" class="label-de-emphasized">1) Land wählen (optional)</label>
+        <select id="countrySelect"></select>
+
+        <label for="brandInput" class="label-emphasized">2) Marke/System suchen</label>
         <div class="autocomplete-container">
-            <input type="text" id="systemInput" placeholder="System tippen..." disabled>
-            <div class="autocomplete-results" id="systemResults"></div>
+            <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
+            <div class="autocomplete-results" id="brandResults"></div>
+        </div>
+
+        <label for="citySelect" class="label-de-emphasized">3) Stadt filtern (optional)</label>
+        <select id="citySelect" disabled></select>
+
+        <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
+
+        <div class="grid">
+            <div>
+                <label for="fileBase">Dateiname</label>
+                <input id="fileBase" type="text" value="nextbike_stations" />
+            </div>
+            <div>
+                <label for="quickFilter">Schnellfilter</label>
+                <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+            </div>
         </div>
         
         <div class="checkbox-container">
@@ -148,7 +290,7 @@
         </div>
 
         <div class="row">
-          <button class="primary" id="loadBtn"><span id="loadIcon"></span>Auswahl laden</button>
+          <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
         </div>
         <div class="load-status" id="load-status">Initialisiere...</div>
       </div>
@@ -158,163 +300,360 @@
         <button id="toggle-left-panel" class="panel-toggle-btn" title="Steuerung einklappen">◀</button>
     </div>
 
-    <section id="map"></section>
+    <section id="map-container">
+      <div id="map"></div>
+    </section>
+
+    <div class="toggle-container" id="right-toggle-container">
+        <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
+    </div>
+
+    <section class="panel" id="right-panel">
+        <div class="panel-content" style="display: flex; flex-direction: column;">
+            <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
+            <div class="row">
+                <button class="primary" id="geojsonBtn" disabled>GeoJSON download</button>
+            </div>
+        </div>
+    </section>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
   <script>
     const $ = sel => document.querySelector(sel);
     const corsProxy = 'https://corsproxy.io/?';
 
-    let map;
-    let stationMarkers = L.markerClusterGroup();
-    let flexzoneLayer = L.geoJSON(null, {
-        style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 },
-        onEachFeature: (f, l) => { if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`); }
-    });
+    let map, layer, currentGeoJSON = null;
+    let flexzoneLayer;
+    let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
+    let selectedBrandDomain = null;
+    let allFlexzones = []; // Cache für alle Flexzonen
 
-    let allSystems = [];
-    let selectedSystem = null;
-
-    const stationIcon = L.icon({
+    const nextbikeIcon = L.icon({
         iconUrl: 'marker_nbblue.png',
-        iconSize: [35, 35], iconAnchor: [17, 35], popupAnchor: [0, -35]
+        iconSize:     [35, 35],
+        iconAnchor:   [17, 35],
+        popupAnchor:  [0, -35]
     });
-    
+
     function initMap(){
+      const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      });
       const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
           maxZoom: 20
       });
-      map = L.map('map', { layers: [positron] }).setView([51.16, 10.45], 6);
-      stationMarkers.addTo(map);
-      flexzoneLayer.addTo(map);
+      const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri'
+      });
+      const baseMaps = {
+          "Standard": osm,
+          "Hell (CARTO)": positron,
+          "Satellit (Esri)": satellite
+      };
+
+      map = L.map('map', { layers: [positron] });
+      L.control.layers(baseMaps).addTo(map);
+
+      map.setView([51.1657, 10.4515], 6);
+      
+      layer = L.geoJSON(null, {
+        pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
+        onEachFeature: (f, l) => {
+          const p = f.properties || {};
+          l.bindPopup(`<strong>${p.name||'Station'}</strong><br>`+
+                      `Fahrräder: ${p.num_bikes_available ?? '–'}<br>`+
+                      `Freie Plätze: ${p.num_docks_available ?? '–'}<br>`+
+                      `ID: ${p.station_id}`);
+        }
+      }).addTo(map);
+
+      flexzoneLayer = L.geoJSON(null, {
+          style: { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 },
+          onEachFeature: (f, l) => {
+              if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`);
+          }
+      }).addTo(map);
     }
 
-    async function loadSystemList() {
-        $('#load-status').textContent = 'Lade Systemliste...';
-        const systemInput = $('#systemInput');
+    function option(value, label){ const o = document.createElement('option'); o.value = value; o.textContent = label; return o; }
+
+    function dedupeCountries(countriesIn){
+      const mapC = new Map();
+      countriesIn.forEach(c => {
+        const code = (c.country || c.country_code || '').toUpperCase();
+        const name = c.country_name || '';
+        if(name && code && !mapC.has(code)) mapC.set(code, { country_code: code, country_name: name });
+      });
+      let arr = Array.from(mapC.values());
+      arr.sort((a,b) => (a.country_name==='Germany' ? -1 : b.country_name==='Germany' ? 1 : (a.country_name||'').localeCompare(b.country_name||'')));
+      return arr;
+    }
+
+    function buildBrands(dataCountries) {
+        const mapB = new Map();
+        dataCountries.forEach(topLevelObject => {
+            const geo_country_code = (topLevelObject.country || '').toUpperCase();
+            const processEntity = (entity, nameFallback) => {
+                const domain = (entity.domain || '').toLowerCase();
+                if (!domain) return;
+                const name = entity.name || entity.alias || nameFallback || `System ${domain}`;
+                if (!mapB.has(domain)) {
+                    mapB.set(domain, { key: domain, domain, name, country_codes: new Set() });
+                }
+                if (geo_country_code) mapB.get(domain).country_codes.add(geo_country_code);
+            };
+            processEntity(topLevelObject);
+            if (topLevelObject.cities) {
+                topLevelObject.cities.forEach(city => processEntity(city, city.city));
+            }
+        });
+        return Array.from(mapB.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    async function loadLists(){
+      $('#load-status').style.visibility = 'visible';
+      $('#load-status').textContent = 'Systeme werden geladen...';
+      try{
+        const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0`;
+        const resp = await fetch(url, { cache: 'no-store' });
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data || !data.countries) throw new Error("API-Antwort ist ungültig.");
+
+        rawCountries = data.countries;
+        countryList = dedupeCountries(rawCountries);
+        brandList = buildBrands(rawCountries);
+
+        const cSel = $('#countrySelect'); cSel.innerHTML = '';
+        cSel.appendChild(option('', 'Alle Länder (weltweit)'));
+        countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
+        
+        updateAvailableBrands();
+        $('#load-status').textContent = 'Bitte Auswahl treffen.';
+        
+        loadAllFlexzones();
+      }catch(e){
+        $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
+        alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
+      }
+    }
+
+    async function loadAllFlexzones() {
         try {
-            const url = `${corsProxy}https://gbfs.nextbike.net/systems.json`;
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status} - Server nicht erreichbar`);
-            const data = await resp.json();
-            allSystems = data.data.systems;
-            
-            systemInput.disabled = false;
-            systemInput.placeholder = `${allSystems.length} Systeme verfügbar...`;
-            $('#load-status').textContent = 'Bitte System wählen.';
+            const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
+            if (!flexzoneResp.ok) throw new Error(`Flexzonen-API HTTP ${flexzoneResp.status}`);
+            const flexzoneData = await flexzoneResp.json();
+            if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
+                allFlexzones = flexzoneData.geojson.nodeValue.features;
+            }
         } catch(e) {
-            // Verbesserte Fehlermeldung im UI
-            const errorMsg = 'Fehler: Systemliste nicht erreichbar.';
-            $('#load-status').textContent = errorMsg;
-            systemInput.placeholder = 'Laden fehlgeschlagen';
-            console.error("Fehler beim Laden der Systemliste:", e);
+            console.warn("Die globale Flexzonen-Liste konnte nicht geladen werden:", e);
         }
     }
 
-    function setupSystemSearch() {
-        const systemInput = $('#systemInput');
-        const systemResults = $('#systemResults');
+    function updateAvailableBrands(){
+      const countryCode = ($('#countrySelect').value || '').toUpperCase();
+      const brandInput = $('#brandInput');
+      
+      availableBrands = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
+      
+      brandInput.value = '';
+      selectedBrandDomain = null;
+      brandInput.disabled = false;
+      brandInput.placeholder = `${availableBrands.length} Marken/Systeme verfügbar...`;
+      refreshCitySelect();
+    }
 
-        systemInput.addEventListener('input', () => {
-            const query = systemInput.value.toLowerCase();
-            selectedSystem = null;
+    async function refreshCitySelect(){
+      const brandKey = selectedBrandDomain;
+      const citySel = $('#citySelect');
+      citySel.innerHTML = '<option value="">[optional] Alle Städte im System</option>';
+      if(!brandKey){ citySel.disabled = true; return; }
+      
+      citySel.disabled = true;
+    }
 
+    function fcFromNextbike(json){
+      const features = [];
+      json.countries?.forEach(country => {
+        country.cities?.forEach(city => {
+          const domain = city.domain || '';
+          city.places?.forEach(place => {
+            if(typeof place.lat !== 'number' || typeof place.lng !== 'number') return;
+            features.push({ 
+              type:'Feature', 
+              geometry:{ type:'Point', coordinates:[place.lng, place.lat] }, 
+              properties: {
+                station_id: String(place.number ?? place.uid ?? ''), name: place.name || '', address: place.address || '',
+                capacity: place.bike_racks ?? null, num_bikes_available: place.bikes ?? null, num_docks_available: place.free_racks ?? null,
+                city_uid: city.uid ?? null, city_name: city.name || city.city || city.alias || '', domain, country_name: country.country_name || ''
+              }
+            });
+          });
+        });
+      });
+      return { type:'FeatureCollection', features };
+    }
+    
+    async function loadData(){
+      const loadBtn = $('#loadBtn');
+      loadBtn.disabled = true;
+      $('#loadIcon').innerHTML = '<span class="spinner"></span>';
+      $('#load-status').textContent = 'Lade Stationen...';
+      
+      try{
+        const domain = selectedBrandDomain;
+        const countryCode = ($('#countrySelect').value || '').toUpperCase();
+        
+        let baseUrl = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
+        if(domain) {
+            baseUrl += `&domains=${domain}`;
+        } else if (countryCode) {
+            baseUrl += `&countries=${countryCode}`;
+        }
+
+        const resp = await fetch(`${corsProxy}${baseUrl}`, { cache: 'no-store' });
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        let fc = fcFromNextbike(data);
+
+        const filterTxt = ($('#quickFilter').value||'').trim().toLowerCase();
+        if(filterTxt){
+          fc.features = fc.features.filter(f => `${f.properties.name} ${f.properties.address}`.toLowerCase().includes(filterTxt));
+        }
+
+        currentGeoJSON = fc;
+        const stationCount = fc.features.length;
+        const timestamp = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
+        const statusDiv = $('#load-status');
+        statusDiv.innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
+        statusDiv.style.visibility = 'visible';
+
+        $('#geojson-output').value = JSON.stringify(fc, null, 2);
+        layer.clearLayers().addData(fc);
+        
+        $('#geojsonBtn').disabled = fc.features.length === 0;
+
+        flexzoneLayer.clearLayers();
+        if ($('#flexzonesCheckbox').checked && allFlexzones.length > 0 && selectedBrandDomain) {
+            const relevantFeatures = allFlexzones.filter(f => f.properties?.domain === selectedBrandDomain);
+            if (relevantFeatures.length > 0) {
+                const flexzoneGeoJSON = {
+                    type: "FeatureCollection",
+                    features: relevantFeatures
+                };
+                flexzoneLayer.addData(flexzoneGeoJSON);
+            }
+        }
+        
+        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
+        if (combinedLayer.getLayers().length > 0) {
+            const bounds = combinedLayer.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, {padding: [50, 50]});
+            }
+        } else {
+             map.setView([51.1657, 10.4515], 6);
+        }
+
+      }catch(e){ 
+          $('#load-status').textContent = 'Fehler: '+e.message; 
+          $('#geojsonBtn').disabled = true; 
+      }
+      finally{ 
+          loadBtn.disabled = false; 
+          $('#loadIcon').innerHTML = '';
+      }
+    }
+    
+    function setupSidebars() {
+        const wrap = $('#main-wrap');
+        const toggleLeftBtn = $('#toggle-left-panel');
+        const toggleRightBtn = $('#toggle-right-panel');
+
+        toggleLeftBtn.addEventListener('click', () => {
+            wrap.classList.toggle('left-collapsed');
+            toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
+            setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350); 
+        });
+
+        if (toggleRightBtn) {
+            toggleRightBtn.addEventListener('click', () => {
+                wrap.classList.toggle('right-collapsed');
+                toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
+                setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
+            });
+        }
+    }
+
+    function setupBrandSearch() {
+        const brandInput = $('#brandInput');
+        const brandResults = $('#brandResults');
+        const countrySelect = $('#countrySelect');
+
+        function filterAndDisplay() {
+            const query = brandInput.value.toLowerCase();
+            selectedBrandDomain = null;
+            
             if (!query) {
-                systemResults.style.display = 'none';
+                brandResults.style.display = 'none';
                 return;
             }
             
-            // Stellt sicher, dass allSystems ein Array ist, auch wenn der Ladevorgang fehlschlug
-            const filtered = (allSystems || []).filter(s => s.name.toLowerCase().includes(query));
+            let filtered = allSystems;
+            const countryCode = countrySelect.value;
+            if (countryCode) {
+                filtered = filtered.filter(s => s.country_code === countryCode);
+            }
             
-            systemResults.innerHTML = '';
+            filtered = filtered.filter(s => s.name.toLowerCase().includes(query) || s.domain.toLowerCase().includes(query));
+            
+            brandResults.innerHTML = '';
             if (filtered.length > 0) {
                 filtered.slice(0, 100).forEach(system => {
                     const item = document.createElement('div');
                     item.className = 'autocomplete-item';
-                    item.textContent = system.name;
+                    item.innerHTML = `${system.name} <small>(${system.domain})</small>`;
                     item.addEventListener('click', () => {
-                        systemInput.value = system.name;
-                        selectedSystem = system;
-                        systemResults.style.display = 'none';
+                        brandInput.value = system.name;
+                        selectedBrandDomain = system.domain;
+                        brandResults.style.display = 'none';
                     });
-                    systemResults.appendChild(item);
+                    brandResults.appendChild(item);
                 });
-                systemResults.style.display = 'block';
+                brandResults.style.display = 'block';
             } else {
                 systemResults.style.display = 'none';
             }
+        }
+        
+        brandInput.addEventListener('input', filterAndDisplay);
+        countrySelect.addEventListener('change', () => {
+            brandInput.value = '';
+            updateAvailableBrands();
         });
+
         document.addEventListener('click', (e) => {
             if (!$('.autocomplete-container').contains(e.target)) {
-                systemResults.style.display = 'none';
+                brandResults.style.display = 'none';
             }
         });
     }
 
-    async function loadData() {
-        if (!selectedSystem) {
-            alert("Bitte zuerst ein System aus der Liste auswählen.");
-            return;
-        }
-
-        const loadBtn = $('#loadBtn');
-        loadBtn.disabled = true;
-        $('#loadIcon').innerHTML = '<span class="spinner"></span>';
-        $('#load-status').textContent = 'Lade Daten für ' + selectedSystem.name;
-
-        stationMarkers.clearLayers();
-        flexzoneLayer.clearLayers();
-
-        try {
-            const gbfsUrl = `${corsProxy}${selectedSystem.url}`;
-            const gbfsResp = await fetch(gbfsUrl);
-            if (!gbfsResp.ok) throw new Error(`GBFS für ${selectedSystem.name} nicht gefunden.`);
-            const gbfsData = await gbfsResp.json();
-
-            const lang = Object.keys(gbfsData.data)[0];
-            if (!lang) throw new Error("Keine Sprachfeeds gefunden.");
-            
-            const feeds = gbfsData.data[lang].feeds;
-            const stationInfoUrl = feeds.find(f => f.name === 'station_information')?.url;
-            const stationStatusUrl = feeds.find(f => f.name === 'station_status')?.url;
-            const zonesUrl = feeds.find(f => f.name === 'geofencing_zones')?.url;
-
-            const requests = [];
-            if (stationInfoUrl && stationStatusUrl) {
-                requests.push(fetch(`${corsProxy}${stationInfoUrl}`).then(r => r.json()));
-                requests.push(fetch(`${corsProxy}${stationStatusUrl}`).then(r => r.json()));
-            }
-
-            if (requests.length > 0) {
-                const [infoData, statusData] = await Promise.all(requests);
-                
-                const infoMap = new Map(infoData.data.stations.map(s => [s.station_id, s]));
-                let stationCount = 0;
-                statusData.data.stations.forEach(s => {
-                    const i = infoMap.get(s.station_id);
-                    if (!i) return;
-                    const marker = L.marker([i.lat, i.lon], { icon: stationIcon }).bindPopup(
-                        `<b>${i.name}</b><br>Räder: ${s.num_bikes_available}`
-                    );
-                    stationMarkers.addLayer(marker);
-                    stationCount++;
-                });
-                 $('#load-status').textContent = `${stationCount} Stationen für ${selectedSystem.name} geladen.`;
-            } else {
-                 $('#load-status').textContent = `Keine Stations-Feeds für ${selectedSystem.name} gefunden.`;
-            }
-
-            if ($('#flexzonesCheckbox').checked && zonesUrl) {
-                const zonesResp = await fetch(`${corsProxy}${zonesUrl}`);
-                if (zonesResp.ok) {
-                    const zonesData = await zonesResp.json();
-                    flexzoneLayer.addData(zonesData);
-                }
-            }
-
-            const combinedLayer = L.featureGroup([...stationMarkers.getLayers(), ...flexzoneLayer.getLayers()]);
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      loadLists();
+      setupSidebars();
+      setupBrandSearch();
+      //$('#countrySelect').addEventListener('change', updateAvailableBrands); // Wird jetzt von setupBrandSearch gehandhabt
+      $('#loadBtn').addEventListener('click', loadData);
+    });
+  </script>
+</body>
+</html>
