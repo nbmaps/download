@@ -24,7 +24,7 @@
     }
 
     html {
-        font-size: 85%; /* Global kleinere Schrift */
+        font-size: 85%;
     }
 
     * { box-sizing: border-box; }
@@ -42,9 +42,8 @@
     
     .wrap {
         display: grid;
-        /* Layout: Linke Leiste, linker Toggle, KARTE, rechter Toggle, rechte Leiste */
         grid-template-columns: var(--left-panel-width) var(--toggle-btn-width) 1fr var(--toggle-btn-width) var(--right-panel-width);
-        gap: 0; /* Kein Abstand, da die Toggles direkt an den Rändern sitzen */
+        gap: 0;
         padding: 15px;
         flex-grow: 1;
         overflow: hidden;
@@ -164,6 +163,12 @@
         margin-top: 1.5rem;
     }
 
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
     .load-status {
         margin-top: 1rem;
         font-size: 1rem;
@@ -206,8 +211,16 @@
 
         <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
 
-        <label for="quickFilter">Schnellfilter</label>
-        <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+        <div class="grid">
+            <div>
+                <label for="fileBase">Dateiname</label>
+                <input id="fileBase" type="text" value="nextbike_stations" />
+            </div>
+            <div>
+                <label for="quickFilter">Schnellfilter</label>
+                <input id="quickFilter" type="text" placeholder="z. B. „Hauptbahnhof“" />
+            </div>
+        </div>
         
         <div class="row">
           <button class="primary" id="loadBtn"><span id="loadIcon"></span>Stationen laden</button>
@@ -415,7 +428,9 @@
         currentGeoJSON = fc;
         const stationCount = fc.features.length;
         const timestamp = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' });
-        $('#load-status').innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
+        const statusDiv = $('#load-status');
+        statusDiv.innerHTML = `<strong>${stationCount}</strong> Stationen geladen (${timestamp})`;
+        statusDiv.style.visibility = 'visible';
 
         $('#geojson-output').value = JSON.stringify(fc, null, 2);
         layer.clearLayers().addData(fc);
