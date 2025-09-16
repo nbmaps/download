@@ -372,21 +372,94 @@ function setupSidebars() {
     const wrap = $('#main-wrap');
     const toggleLeftBtn = $('#toggle-left-panel');
     const toggleRightBtn = $('#toggle-right-panel');
+    const mapContainer = $('#map-container'); // Das ist dein Karten-Container
 
-    toggleLeftBtn.addEventListener('click', () => {
+    function toggleLeftPanel() {
         wrap.classList.toggle('left-collapsed');
         toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
         setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350); 
-    });
+        updateMapInteractionForMobile(); // NEUER AUFRUF
+    }
 
+    function toggleRightPanel() {
+        wrap.classList.toggle('right-collapsed');
+        toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
+        setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
+        updateMapInteractionForMobile(); // NEUER AUFRUF
+    }
+
+    toggleLeftBtn.addEventListener('click', toggleLeftPanel);
     if (toggleRightBtn) {
-        toggleRightBtn.addEventListener('click', () => {
-            wrap.classList.toggle('right-collapsed');
-            toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
-            setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
-        });
+        toggleRightBtn.addEventListener('click', toggleRightPanel);
+    }
+
+    // NEUE FUNKTION: Verwaltet die Interaktion mit der Karte, wenn ein Panel offen ist
+    function updateMapInteractionForMobile() {
+        // Prüfen, ob wir im mobilen Modus sind (gemäß CSS Media Query)
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            const isLeftOpen = !wrap.classList.contains('left-collapsed');
+            const isRightOpen = !wrap.classList.contains('right-collapsed');
+
+            if (isLeftOpen || isRightOpen) {
+                // Wenn ein Panel offen ist, füge einen Klick-Handler zum Karten-Container hinzu
+                // Dieser schließt das Panel und entfernt sich selbst wieder
+                mapContainer.addEventListener('click', closeOpenPanelsOnMapClick, { once: true });
+                // Optional: Füge eine Klasse zum Body hinzu, um die Karte abzudunkeln
+                document.body.classList.add('panel-open');
+            } else {
+                // Wenn beide Panels geschlossen sind, entferne die Klasse
+                document.body.classList.remove('panel-open');
+                // Sicherstellen, dass der Event Listener entfernt ist, falls er doch noch hängt
+                mapContainer.removeEventListener('click', closeOpenPanelsOnMapClick);
+            }
+        } else {
+            // Auf Desktop/Tablet immer die Klasse entfernen
+            document.body.classList.remove('panel-open');
+            mapContainer.removeEventListener('click', closeOpenPanelsOnMapClick);
+        }
+    }
+
+    // Handler, der aufgerufen wird, wenn auf die Karte geklickt wird und ein Panel offen ist
+    function closeOpenPanelsOnMapClick() {
+        const isLeftOpen = !wrap.classList.contains('left-collapsed');
+        const isRightOpen = !wrap.classList.contains('right-collapsed');
+        
+        if (isLeftOpen) {
+            toggleLeftPanel(); // Schließt das linke Panel
+        }
+        if (isRightOpen) {
+            toggleRightPanel(); // Schließt das rechte Panel
+        }
+        // document.body.classList.remove('panel-open'); // Wird von updateMapInteractionForMobile übernommen
+    }
+
+    // Initialen Zustand für Mobilgeräte setzen und Map-Interaktion aktualisieren
+    // Der Aufruf erfolgt jetzt hier in setupSidebars, statt direkt im DOMContentLoaded
+    // Dies stellt sicher, dass updateMapInteractionForMobile direkt nach dem Start aufgerufen wird
+    setInitialMobilePanelStateAndMapInteraction(); 
+
+    // Die Funktion setInitialMobilePanelState() wird zu setInitialMobilePanelStateAndMapInteraction()
+    function setInitialMobilePanelStateAndMapInteraction() {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        if (isMobile) {
+            wrap.classList.add('left-collapsed');
+            toggleLeftBtn.textContent = '▶'; 
+            if (toggleRightBtn) {
+                wrap.classList.add('right-collapsed');
+                toggleRightBtn.textContent = '◀'; 
+            }
+        } else {
+            wrap.classList.remove('left-collapsed');
+            toggleLeftBtn.textContent = '◀';
+            if (toggleRightBtn) {
+                wrap.classList.remove('right-collapsed');
+                toggleRightBtn.textContent = '▶';
+            }
+        }
+        updateMapInteractionForMobile(); // Hier wird sichergestellt, dass die Karte von Anfang an reagiert
     }
 }
+
 
 // NEUE FUNKTION: Setzt den initialen Zustand der Panels für Mobilgeräte
 function setInitialMobilePanelState() {
@@ -481,10 +554,7 @@ window.addEventListener('DOMContentLoaded', () => {
     loadLists();
     setupSidebars();
     setupBrandSearch();
-    
-    // HIER WIRD DIE NEUE FUNKTION AUFGERUFEN, nachdem die Sidebars eingerichtet sind
-    setInitialMobilePanelState(); 
-    
+       
     $('#loadBtn').addEventListener('click', loadData);
     
     // ANPASSUNG 1: GeoJSON Download Button
