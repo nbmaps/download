@@ -436,27 +436,31 @@ function setupSidebars() {
     // Initialen Zustand für Mobilgeräte setzen und Map-Interaktion aktualisieren
     // Der Aufruf erfolgt jetzt hier in setupSidebars, statt direkt im DOMContentLoaded
     // Dies stellt sicher, dass updateMapInteractionForMobile direkt nach dem Start aufgerufen wird
-    setInitialMobilePanelStateAndMapInteraction(); 
+    function setInitialMobilePanelState() {
+    const wrap = $('#main-wrap');
+    const toggleLeftBtn = $('#toggle-left-panel');
+    const toggleRightBtn = $('#toggle-right-panel'); // Stelle sicher, dass dies existiert
 
-    // Die Funktion setInitialMobilePanelState() wird zu setInitialMobilePanelStateAndMapInteraction()
-    function setInitialMobilePanelStateAndMapInteraction() {
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
-        if (isMobile) {
-            wrap.classList.add('left-collapsed');
-            toggleLeftBtn.textContent = '▶'; 
-            if (toggleRightBtn) {
-                wrap.classList.add('right-collapsed');
-                toggleRightBtn.textContent = '◀'; 
-            }
-        } else {
-            wrap.classList.remove('left-collapsed');
-            toggleLeftBtn.textContent = '◀';
-            if (toggleRightBtn) {
-                wrap.classList.remove('right-collapsed');
-                toggleRightBtn.textContent = '▶';
-            }
+    // Prüfe, ob wir uns auf einem mobilen Bildschirm befinden (basierend auf dem CSS Breakpoint)
+    // Beachte: 'matches' spiegelt den aktuellen Zustand wider
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        // Auf Mobilgeräten sollen beide Panels standardmäßig geschlossen sein
+        wrap.classList.add('left-collapsed');
+        toggleLeftBtn.textContent = '▶'; // Pfeil nach rechts, da Panel geschlossen ist
+        
+        if (toggleRightBtn) { // Überprüfe, ob der rechte Toggle-Button existiert
+            wrap.classList.add('right-collapsed');
+            toggleRightBtn.textContent = '◀'; // Pfeil nach links, da Panel geschlossen ist
         }
-        updateMapInteractionForMobile(); // Hier wird sichergestellt, dass die Karte von Anfang an reagiert
+    } else {
+        // Auf größeren Bildschirmen (Desktop/Tablet) sollen sie standardmäßig offen sein
+        wrap.classList.remove('left-collapsed');
+        toggleLeftBtn.textContent = '◀'; // Pfeil nach links, da Panel offen ist
+        
+        if (toggleRightBtn) {
+            wrap.classList.remove('right-collapsed');
+            toggleRightBtn.textContent = '▶'; // Pfeil nach rechts, da Panel offen ist
+        }
     }
 }
 
