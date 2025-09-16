@@ -249,3 +249,112 @@ button.primary {
 }
 
 @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+@media (max-width: 768px) {
+    :root {
+        /* Mobile-spezifische Breiten, z.B. Panels nehmen fast volle Breite ein */
+        --left-panel-width: 90vw; /* 90% der Viewport-Breite */
+        --right-panel-width: 90vw;
+        --toggle-btn-width: 40px; /* Toggles etwas größer für Touch */
+    }
+
+    body {
+        overflow: auto; /* Erlaube Scrollen, falls nötig */
+    }
+
+    .wrap {
+        /* Für Mobile nur eine Spalte für die Karte. Panels werden positioniert */
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr; /* Karte nimmt den verfügbaren Raum ein */
+    }
+
+    /* Panels sollen über die Karte gelegt werden */
+    .panel {
+        position: fixed; /* Fixiere Panels relativ zum Viewport */
+        top: 0;
+        bottom: 0;
+        z-index: 1000; /* Stelle sicher, dass sie über der Karte liegen */
+        width: var(--left-panel-width); /* Nutze die Mobile-Breite */
+        max-width: 100%; /* Stelle sicher, dass sie nicht über den Bildschirm hinausragen */
+        transition: transform 0.35s ease-in-out;
+        box-shadow: 0 0 15px rgba(0,0,0,0.2); /* Optional: Schatten für besseren visuellen Effekt */
+    }
+
+    #left-panel {
+        left: 0;
+        transform: translateX(-100%); /* Standardmäßig ausgeblendet nach links */
+    }
+    .wrap.left-collapsed #left-panel {
+        transform: translateX(-100%);
+    }
+    .wrap:not(.left-collapsed) #left-panel {
+        transform: translateX(0); /* Eingeblendet */
+    }
+
+    #right-panel {
+        right: 0;
+        transform: translateX(100%); /* Standardmäßig ausgeblendet nach rechts */
+    }
+    .wrap.right-collapsed #right-panel {
+        transform: translateX(100%);
+    }
+    .wrap:not(.right-collapsed) #right-panel {
+        transform: translateX(0); /* Eingeblendet */
+    }
+    
+    /* Toggle-Buttons neu positionieren und auf der Karte lassen */
+    .toggle-container {
+        position: fixed; /* Positionieren über der Karte */
+        top: 10px; /* Etwas Abstand vom oberen Rand */
+        background-color: rgba(255, 255, 255, 0.8); /* Leichter Hintergrund, um Buttons sichtbar zu machen */
+        border-radius: 5px;
+        z-index: 999; /* Unter Panels, aber über Karte */
+        width: var(--toggle-btn-width); /* Breite anpassen */
+        height: var(--toggle-btn-width); /* Höhe anpassen */
+    }
+    #left-toggle-container {
+        left: 10px;
+        grid-column: 1; /* Wichtig, da wir kein Grid mehr haben */
+        grid-row: 1;
+    }
+    #right-toggle-container {
+        right: 10px;
+        grid-column: 1; /* Wichtig, da wir kein Grid mehr haben */
+        grid-row: 1;
+    }
+
+    .panel-toggle-btn {
+        font-size: 1.5rem; /* Größere Pfeile für Touch */
+        padding: 0; /* Padding zurücksetzen */
+        width: 100%;
+        height: 100%;
+        display: flex; /* Für Zentrierung */
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Das "grid" für Dateiname/Filter musste entfernt werden. 
+       Wenn du ein Grid für andere Elemente hast, muss es hier neu definiert werden, 
+       z.B. auf eine Spalte. */
+    .grid {
+        grid-template-columns: 1fr; /* Alle Elemente untereinander */
+        gap: 10px;
+    }
+
+    /* Standardmäßig Panel schließen auf Mobile (initial state) */
+    .wrap {
+        /* Initialzustand für Mobile, panels sind geschlossen */
+        grid-template-columns: 1fr; /* Nur die Karte sichtbar */
+    }
+    #main-wrap { /* Direkt auf das wrap Element anwenden */
+        grid-template-columns: 1fr; /* Nur eine Spalte für die Karte */
+    }
+    #left-panel, #right-panel {
+        /* Panels sollen am Anfang komplett außerhalb des Bildschirms sein */
+        transform: translateX(-100%); /* Links-Panel unsichtbar */
+        transform: translateX(100%);  /* Rechts-Panel unsichtbar */
+    }
+    .wrap.left-collapsed #left-panel { transform: translateX(-100%); }
+    .wrap.right-collapsed #right-panel { transform: translateX(100%); }
+    .wrap:not(.left-collapsed) #left-panel { transform: translateX(0); }
+    .wrap:not(.right-collapsed) #right-panel { transform: translateX(0); }
+}
