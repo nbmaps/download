@@ -4,7 +4,7 @@ const corsProxy = 'https://corsproxy.io/?';
 let map, layer, currentGeoJSON = null;
 let flexzoneLayer;
 let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
-let selectedBrandDomain = null; // DIESE VARIABLE ENTHÄLT DEN 2-BUCHSTABEN-ALIAS
+let selectedBrandDomain = null;
 let allFlexzones = []; 
 
 const nextbikeIcon = L.icon({
@@ -65,7 +65,6 @@ function initMap(){
     });
 
     layer.addTo(map);
-    // Füge Flexzonen initial zur Karte hinzu, wenn die Checkbox standardmäßig aktiviert ist
     if ($('#flexzonesCheckbox').checked) {
         flexzoneLayer.addTo(map);
     }
@@ -142,37 +141,21 @@ async function loadLists(){
 
 async function loadAllFlexzones() {
     try {
-        // console.log("Starte Abruf der Flexzonen-API..."); // Debug-Ausgabe kann entfernt werden
         const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
-        
         if (!flexzoneResp.ok) {
             const errorText = await flexzoneResp.text();
             console.error(`Flexzonen-API HTTP Fehler: ${flexzoneResp.status} - ${errorText}`);
             throw new Error(`Flexzonen-API HTTP ${flexzoneResp.status}`);
         }
-        
         const flexzoneData = await flexzoneResp.json();
-        // Die Debug-Ausgaben können jetzt entfernt oder beibehalten werden, wie du möchtest
-        // console.log("Vollständige Flexzonen-API-Antwort:", flexzoneData);
-        // console.log("Typ von flexzoneData.geojson:", typeof flexzoneData.geojson);
-        // if (flexzoneData.geojson) {
-        //     console.log("Typ von flexzoneData.geojson.nodeValue:", typeof flexzoneData.geojson.nodeValue);
-        //     console.log("Inhalt von flexzoneData.geojson.nodeValue (erste 200 Zeichen):", String(flexzoneData.geojson.nodeValue).substring(0, 200));
-        // }
-
-        // --- KORRIGIERTE LOGIK START ---
         if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
             allFlexzones = flexzoneData.geojson.nodeValue.features;
-            // console.log(`Erfolgreich ${allFlexzones.length} Flexzonen geladen.`); // Debug-Ausgabe kann entfernt werden
         } else if (flexzoneData.geojson && flexzoneData.geojson.features) {
             allFlexzones = flexzoneData.geojson.features;
-            // console.log(`Erfolgreich ${allFlexzones.length} Flexzonen direkt unter 'geojson.features' geladen.`); // Debug-Ausgabe kann entfernt werden
         } else {
-            console.warn("Flexzonen-API-Antwort enthielt kein erwartetes GeoJSON-Format (weder unter .geojson.nodeValue.features noch unter .geojson.features).");
+            console.warn("Flexzonen-API-Antwort enthielt kein erwartetes GeoJSON-Format.");
             allFlexzones = [];
         }
-        // --- KORRIGIERTE LOGIK ENDE ---
-
     } catch(e) {
         console.error("Fehler beim Laden der Flexzonen-Liste:", e);
         allFlexzones = [];
@@ -332,34 +315,44 @@ function generateFilename(cityAlias) {
     const day = now.getDate().toString().padStart(2, '0');
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const seconds = now.getSeconds().getSeconds().toString().padStart(2, '0');
 
     // Beispiel: "2023-10-27_14-35-00_le_stations"
     return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_${cityAlias}_stations`;
 }
 
+// Der Rest deines Codes bleibt unverändert
 async function downloadZip() {
     if (!currentGeoJSON) return;
 
     const zip = new JSZip();
+    // Verwende die neue Funktion zur Namensgenerierung
     const baseFilename = generateFilename(selectedBrandDomain);
     
+    // Stations-GeoJSON hinzufügen
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
 
     const flexzoneGeoJSON = flexzoneLayer.toGeoJSON();
     
+    // Überprüfe, ob es Flexzonen-Features gibt
     if (flexzoneGeoJSON.features.length > 0) {
+        // Die komplette Flexzonen-Datei hinzufügen
         zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
 
+        // Jedes Flexzonen-Feature als separate Datei hinzufügen
         flexzoneGeoJSON.features.forEach(feature => {
             const featureName = feature.properties.name;
+            // Erstelle einen gültigen Dateinamen: Buchstaben, Zahlen und Unterstriche
+            // Ersetze alles, was kein Wort-Zeichen, Zahl oder Unterstriche ist, durch einen Unterstrich.
             const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_flexzone';
             
+            // Erstelle ein GeoJSON FeatureCollection-Objekt nur für dieses eine Feature
             const singleFeatureGeoJSON = {
                 type: "FeatureCollection",
                 features: [feature]
             };
 
+            // Füge die Datei zum ZIP-Archiv hinzu
             zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
         });
     }
@@ -372,98 +365,21 @@ function setupSidebars() {
     const wrap = $('#main-wrap');
     const toggleLeftBtn = $('#toggle-left-panel');
     const toggleRightBtn = $('#toggle-right-panel');
-    const mapContainer = $('#map-container'); // Das ist dein Karten-Container
 
-    function toggleLeftPanel() {
+    toggleLeftBtn.addEventListener('click', () => {
         wrap.classList.toggle('left-collapsed');
         toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
         setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350); 
-        updateMapInteractionForMobile(); // NEUER AUFRUF
-    }
+    });
 
-    function toggleRightPanel() {
-        wrap.classList.toggle('right-collapsed');
-        toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
-        setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
-        updateMapInteractionForMobile(); // NEUER AUFRUF
-    }
-
-    toggleLeftBtn.addEventListener('click', toggleLeftPanel);
     if (toggleRightBtn) {
-        toggleRightBtn.addEventListener('click', toggleRightPanel);
-    }
-
-    // NEUE FUNKTION: Verwaltet die Interaktion mit der Karte, wenn ein Panel offen ist
-    function updateMapInteractionForMobile() {
-        // Prüfen, ob wir im mobilen Modus sind (gemäß CSS Media Query)
-        if (window.matchMedia('(max-width: 768px)').matches) {
-            const isLeftOpen = !wrap.classList.contains('left-collapsed');
-            const isRightOpen = !wrap.classList.contains('right-collapsed');
-
-            if (isLeftOpen || isRightOpen) {
-                // Wenn ein Panel offen ist, füge einen Klick-Handler zum Karten-Container hinzu
-                // Dieser schließt das Panel und entfernt sich selbst wieder
-                mapContainer.addEventListener('click', closeOpenPanelsOnMapClick, { once: true });
-                // Optional: Füge eine Klasse zum Body hinzu, um die Karte abzudunkeln
-                document.body.classList.add('panel-open');
-            } else {
-                // Wenn beide Panels geschlossen sind, entferne die Klasse
-                document.body.classList.remove('panel-open');
-                // Sicherstellen, dass der Event Listener entfernt ist, falls er doch noch hängt
-                mapContainer.removeEventListener('click', closeOpenPanelsOnMapClick);
-            }
-        } else {
-            // Auf Desktop/Tablet immer die Klasse entfernen
-            document.body.classList.remove('panel-open');
-            mapContainer.removeEventListener('click', closeOpenPanelsOnMapClick);
-        }
-    }
-
-    // Handler, der aufgerufen wird, wenn auf die Karte geklickt wird und ein Panel offen ist
-    function closeOpenPanelsOnMapClick() {
-        const isLeftOpen = !wrap.classList.contains('left-collapsed');
-        const isRightOpen = !wrap.classList.contains('right-collapsed');
-        
-        if (isLeftOpen) {
-            toggleLeftPanel(); // Schließt das linke Panel
-        }
-        if (isRightOpen) {
-            toggleRightPanel(); // Schließt das rechte Panel
-        }
-        // document.body.classList.remove('panel-open'); // Wird von updateMapInteractionForMobile übernommen
-    }
-
-    // Initialen Zustand für Mobilgeräte setzen und Map-Interaktion aktualisieren
-    // Der Aufruf erfolgt jetzt hier in setupSidebars, statt direkt im DOMContentLoaded
-    // Dies stellt sicher, dass updateMapInteractionForMobile direkt nach dem Start aufgerufen wird
-    function setInitialMobilePanelState() {
-    const wrap = $('#main-wrap');
-    const toggleLeftBtn = $('#toggle-left-panel');
-    const toggleRightBtn = $('#toggle-right-panel'); // Stelle sicher, dass dies existiert
-
-    // Prüfe, ob wir uns auf einem mobilen Bildschirm befinden (basierend auf dem CSS Breakpoint)
-    // Beachte: 'matches' spiegelt den aktuellen Zustand wider
-    if (window.matchMedia('(max-width: 768px)').matches) {
-        // Auf Mobilgeräten sollen beide Panels standardmäßig geschlossen sein
-        wrap.classList.add('left-collapsed');
-        toggleLeftBtn.textContent = '▶'; // Pfeil nach rechts, da Panel geschlossen ist
-        
-        if (toggleRightBtn) { // Überprüfe, ob der rechte Toggle-Button existiert
-            wrap.classList.add('right-collapsed');
-            toggleRightBtn.textContent = '◀'; // Pfeil nach links, da Panel geschlossen ist
-        }
-    } else {
-        // Auf größeren Bildschirmen (Desktop/Tablet) sollen sie standardmäßig offen sein
-        wrap.classList.remove('left-collapsed');
-        toggleLeftBtn.textContent = '◀'; // Pfeil nach links, da Panel offen ist
-        
-        if (toggleRightBtn) {
-            wrap.classList.remove('right-collapsed');
-            toggleRightBtn.textContent = '▶'; // Pfeil nach rechts, da Panel offen ist
-        }
+        toggleRightBtn.addEventListener('click', () => {
+            wrap.classList.toggle('right-collapsed');
+            toggleRightBtn.textContent = wrap.classList.contains('right-collapsed') ? '◀' : '▶';
+            setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350);
+        });
     }
 }
-
 
 // NEUE FUNKTION: Setzt den initialen Zustand der Panels für Mobilgeräte
 function setInitialMobilePanelState() {
@@ -558,18 +474,18 @@ window.addEventListener('DOMContentLoaded', () => {
     loadLists();
     setupSidebars();
     setupBrandSearch();
-       
+    
+    // HIER WIRD DIE NEUE FUNKTION AUFGERUFEN, nachdem die Sidebars eingerichtet sind
+    setInitialMobilePanelState(); 
+    
     $('#loadBtn').addEventListener('click', loadData);
     
     // ANPASSUNG 1: GeoJSON Download Button
     $('#geojsonBtn').addEventListener('click', () => {
         if(!currentGeoJSON) return; 
-
-        // Generiere den Dateinamen dynamisch
         const filename = generateFilename(selectedBrandDomain) + '.geojson';
-        
         const blob = new Blob([$('#geojson-output').value], {type:'application/geo+json;charset=utf-8'}); 
-        saveAs(blob, filename); // Verwende den generierten Dateinamen
+        saveAs(blob, filename); 
     });
     
     // ANPASSUNG 2: Zip Download Button ruft die angepasste Funktion auf
