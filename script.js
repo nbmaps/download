@@ -346,13 +346,34 @@ async function downloadZip() {
 
     const zip = new JSZip();
     // Verwende die neue Funktion zur Namensgenerierung
-    const baseFilename = generateFilename(selectedBrandDomain); // selectedBrandDomain ist dein cityAlias
+    const baseFilename = generateFilename(selectedBrandDomain);
     
+    // Stations-GeoJSON hinzufügen
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
 
     const flexzoneGeoJSON = flexzoneLayer.toGeoJSON();
+    
+    // Überprüfe, ob es Flexzonen-Features gibt
     if (flexzoneGeoJSON.features.length > 0) {
-        zip.file("flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
+        // Die komplette Flexzonen-Datei hinzufügen
+        zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
+
+        // Jedes Flexzonen-Feature als separate Datei hinzufügen
+        flexzoneGeoJSON.features.forEach(feature => {
+            const featureName = feature.properties.name;
+            // Erstelle einen gültigen Dateinamen: Buchstaben, Zahlen und Unterstriche
+            // Ersetze alles, was kein Wort-Zeichen, Zahl oder Unterstrich ist, durch einen Unterstrich.
+            const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_flexzone';
+            
+            // Erstelle ein GeoJSON FeatureCollection-Objekt nur für dieses eine Feature
+            const singleFeatureGeoJSON = {
+                type: "FeatureCollection",
+                features: [feature]
+            };
+
+            // Füge die Datei zum ZIP-Archiv hinzu
+            zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
+        });
     }
 
     const zipBlob = await zip.generateAsync({type:"blob"});
