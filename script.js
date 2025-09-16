@@ -142,7 +142,7 @@ async function loadLists(){
 
 async function loadAllFlexzones() {
     try {
-        console.log("Starte Abruf der Flexzonen-API...");
+        // console.log("Starte Abruf der Flexzonen-API..."); // Debug-Ausgabe kann entfernt werden
         const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
         
         if (!flexzoneResp.ok) {
@@ -162,13 +162,11 @@ async function loadAllFlexzones() {
 
         // --- KORRIGIERTE LOGIK START ---
         if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
-            // Dies ist der Fall, der jetzt eintreten sollte!
             allFlexzones = flexzoneData.geojson.nodeValue.features;
-            console.log(`Erfolgreich ${allFlexzones.length} Flexzonen geladen.`);
+            // console.log(`Erfolgreich ${allFlexzones.length} Flexzonen geladen.`); // Debug-Ausgabe kann entfernt werden
         } else if (flexzoneData.geojson && flexzoneData.geojson.features) {
-            // Fallback, falls 'nodeValue' komplett fehlt, aber 'geojson' direkt 'features' enthält
             allFlexzones = flexzoneData.geojson.features;
-            console.log(`Erfolgreich ${allFlexzones.length} Flexzonen direkt unter 'geojson.features' geladen.`);
+            // console.log(`Erfolgreich ${allFlexzones.length} Flexzonen direkt unter 'geojson.features' geladen.`); // Debug-Ausgabe kann entfernt werden
         } else {
             console.warn("Flexzonen-API-Antwort enthielt kein erwartetes GeoJSON-Format (weder unter .geojson.nodeValue.features noch unter .geojson.features).");
             allFlexzones = [];
@@ -340,38 +338,28 @@ function generateFilename(cityAlias) {
     return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_${cityAlias}_stations`;
 }
 
-// Der Rest deines Codes bleibt unverändert
 async function downloadZip() {
     if (!currentGeoJSON) return;
 
     const zip = new JSZip();
-    // Verwende die neue Funktion zur Namensgenerierung
     const baseFilename = generateFilename(selectedBrandDomain);
     
-    // Stations-GeoJSON hinzufügen
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
 
     const flexzoneGeoJSON = flexzoneLayer.toGeoJSON();
     
-    // Überprüfe, ob es Flexzonen-Features gibt
     if (flexzoneGeoJSON.features.length > 0) {
-        // Die komplette Flexzonen-Datei hinzufügen
         zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
 
-        // Jedes Flexzonen-Feature als separate Datei hinzufügen
         flexzoneGeoJSON.features.forEach(feature => {
             const featureName = feature.properties.name;
-            // Erstelle einen gültigen Dateinamen: Buchstaben, Zahlen und Unterstriche
-            // Ersetze alles, was kein Wort-Zeichen, Zahl oder Unterstrich ist, durch einen Unterstrich.
             const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_flexzone';
             
-            // Erstelle ein GeoJSON FeatureCollection-Objekt nur für dieses eine Feature
             const singleFeatureGeoJSON = {
                 type: "FeatureCollection",
                 features: [feature]
             };
 
-            // Füge die Datei zum ZIP-Archiv hinzu
             zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
         });
     }
@@ -399,6 +387,36 @@ function setupSidebars() {
         });
     }
 }
+
+// NEUE FUNKTION: Setzt den initialen Zustand der Panels für Mobilgeräte
+function setInitialMobilePanelState() {
+    const wrap = $('#main-wrap');
+    const toggleLeftBtn = $('#toggle-left-panel');
+    const toggleRightBtn = $('#toggle-right-panel'); // Stelle sicher, dass dies existiert
+
+    // Prüfe, ob wir uns auf einem mobilen Bildschirm befinden (basierend auf dem CSS Breakpoint)
+    // Beachte: 'matches' spiegelt den aktuellen Zustand wider
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        // Auf Mobilgeräten sollen beide Panels standardmäßig geschlossen sein
+        wrap.classList.add('left-collapsed');
+        toggleLeftBtn.textContent = '▶'; // Pfeil nach rechts, da Panel geschlossen ist
+        
+        if (toggleRightBtn) { // Überprüfe, ob der rechte Toggle-Button existiert
+            wrap.classList.add('right-collapsed');
+            toggleRightBtn.textContent = '◀'; // Pfeil nach links, da Panel geschlossen ist
+        }
+    } else {
+        // Auf größeren Bildschirmen (Desktop/Tablet) sollen sie standardmäßig offen sein
+        wrap.classList.remove('left-collapsed');
+        toggleLeftBtn.textContent = '◀'; // Pfeil nach links, da Panel offen ist
+        
+        if (toggleRightBtn) {
+            wrap.classList.remove('right-collapsed');
+            toggleRightBtn.textContent = '▶'; // Pfeil nach rechts, da Panel offen ist
+        }
+    }
+}
+
 
 function setupBrandSearch() {
     const brandInput = $('#brandInput');
@@ -463,6 +481,10 @@ window.addEventListener('DOMContentLoaded', () => {
     loadLists();
     setupSidebars();
     setupBrandSearch();
+    
+    // HIER WIRD DIE NEUE FUNKTION AUFGERUFEN, nachdem die Sidebars eingerichtet sind
+    setInitialMobilePanelState(); 
+    
     $('#loadBtn').addEventListener('click', loadData);
     
     // ANPASSUNG 1: GeoJSON Download Button
