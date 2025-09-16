@@ -260,7 +260,21 @@ button.primary {
     body {
         overflow: auto; /* Erlaube Scrollen, falls nötig */
     }
-
+    body.panel-open::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparentes Schwarz */
+        z-index: 998; /* Unter den Panels, aber über der Karte */
+        transition: opacity 0.3s ease-in-out;
+    }
+    body:not(.panel-open)::after {
+        opacity: 0;
+        pointer-events: none; /* Macht das Overlay unsichtbar und nicht klickbar, wenn kein Panel offen ist */
+    }
     .wrap {
         /* Für Mobile nur eine Spalte für die Karte. Panels werden positioniert */
         grid-template-columns: 1fr;
@@ -278,7 +292,17 @@ button.primary {
         transition: transform 0.35s ease-in-out;
         box-shadow: 0 0 15px rgba(0,0,0,0.2); /* Optional: Schatten für besseren visuellen Effekt */
     }
-
+    .panel-content {
+        position: relative; /* Wichtig, damit Z-Index funktioniert, falls nötig */
+        z-index: 1001; /* Über dem Overlay */
+        background-color: var(--text-light); /* Sicherstellen, dass der Hintergrund undurchsichtig ist */
+        height: 100%; /* Oder max-height: 100% */
+        overflow-y: auto; /* Scrollen innerhalb des Panels ermöglichen */
+    }
+    .panel {
+        /* ... (Dein bestehendes position: fixed, top, bottom, etc.) ... */
+        overflow: hidden; /* Sicherstellen, dass nichts über das Panel hinausragt */
+    }
     #left-panel {
         left: 0;
         transform: translateX(-100%); /* Standardmäßig ausgeblendet nach links */
