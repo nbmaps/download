@@ -249,3 +249,127 @@ button.primary {
 }
 
 @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+/* Responsive mobile styles */
+@media (max-width: 768px) {
+    :root {
+        --left-panel-width: 90vw;
+        --right-panel-width: 90vw;
+        --toggle-btn-width: 40px;
+    }
+
+    body {
+        overflow: hidden;
+    }
+
+    body.panel-open::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 998;
+        pointer-events: auto;
+        transition: opacity 0.3s ease-in-out;
+        opacity: 1;
+    }
+    body:not(.panel-open)::after {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .wrap {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+        transition: none;
+    }
+
+    .panel {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        max-width: 100%;
+        transition: transform 0.35s ease-in-out, visibility 0.35s ease-in-out;
+        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        visibility: hidden;
+        border: none;
+    }
+    
+    #left-panel {
+        left: 0;
+        width: var(--left-panel-width);
+        transform: translateX(-100%);
+    }
+    #right-panel {
+        right: 0;
+        width: var(--right-panel-width);
+        transform: translateX(100%);
+    }
+
+    .wrap.left-collapsed #left-panel {
+        transform: translateX(-100%);
+        visibility: hidden;
+    }
+    .wrap.right-collapsed #right-panel {
+        transform: translateX(100%);
+        visibility: hidden;
+    }
+
+    .wrap:not(.left-collapsed) #left-panel {
+        transform: translateX(0);
+        visibility: visible;
+    }
+    .wrap:not(.right-collapsed) #right-panel {
+        transform: translateX(0);
+        visibility: visible;
+    }
+
+    .panel-content {
+        position: relative;
+        z-index: 1001;
+        background-color: var(--text-light);
+        height: 100%;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .toggle-container {
+        position: fixed;
+        top: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 5px;
+        z-index: 1002;
+        width: var(--toggle-btn-width);
+        height: var(--toggle-btn-width);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+    }
+    #left-toggle-container { left: 10px; }
+    #right-toggle-container { right: 10px; }
+
+    .panel-toggle-btn {
+        font-size: 1.5rem;
+        padding: 0;
+        color: var(--nextbike-dark-blue);
+    }
+
+    #map-container {
+        z-index: 1;
+        grid-column: 1 / -1;
+        grid-row: 1 / -1;
+    }
+    #map {
+        height: 100%;
+        width: 100%;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}

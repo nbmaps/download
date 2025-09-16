@@ -4,7 +4,7 @@ const corsProxy = 'https://corsproxy.io/?';
 let map, layer, currentGeoJSON = null;
 let flexzoneLayer;
 let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
-let selectedBrandDomain = null; // DIESE VARIABLE ENTHÄLT DEN 2-BUCHSTABEN-ALIAS
+let selectedBrandDomain = null;
 let allFlexzones = []; 
 
 const nextbikeIcon = L.icon({
@@ -65,7 +65,6 @@ function initMap(){
     });
 
     layer.addTo(map);
-    // Füge Flexzonen initial zur Karte hinzu, wenn die Checkbox standardmäßig aktiviert ist
     if ($('#flexzonesCheckbox').checked) {
         flexzoneLayer.addTo(map);
     }
@@ -142,39 +141,21 @@ async function loadLists(){
 
 async function loadAllFlexzones() {
     try {
-        console.log("Starte Abruf der Flexzonen-API...");
         const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
-        
         if (!flexzoneResp.ok) {
             const errorText = await flexzoneResp.text();
             console.error(`Flexzonen-API HTTP Fehler: ${flexzoneResp.status} - ${errorText}`);
             throw new Error(`Flexzonen-API HTTP ${flexzoneResp.status}`);
         }
-        
         const flexzoneData = await flexzoneResp.json();
-        // Die Debug-Ausgaben können jetzt entfernt oder beibehalten werden, wie du möchtest
-        // console.log("Vollständige Flexzonen-API-Antwort:", flexzoneData);
-        // console.log("Typ von flexzoneData.geojson:", typeof flexzoneData.geojson);
-        // if (flexzoneData.geojson) {
-        //     console.log("Typ von flexzoneData.geojson.nodeValue:", typeof flexzoneData.geojson.nodeValue);
-        //     console.log("Inhalt von flexzoneData.geojson.nodeValue (erste 200 Zeichen):", String(flexzoneData.geojson.nodeValue).substring(0, 200));
-        // }
-
-        // --- KORRIGIERTE LOGIK START ---
         if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
-            // Dies ist der Fall, der jetzt eintreten sollte!
             allFlexzones = flexzoneData.geojson.nodeValue.features;
-            console.log(`Erfolgreich ${allFlexzones.length} Flexzonen geladen.`);
         } else if (flexzoneData.geojson && flexzoneData.geojson.features) {
-            // Fallback, falls 'nodeValue' komplett fehlt, aber 'geojson' direkt 'features' enthält
             allFlexzones = flexzoneData.geojson.features;
-            console.log(`Erfolgreich ${allFlexzones.length} Flexzonen direkt unter 'geojson.features' geladen.`);
         } else {
-            console.warn("Flexzonen-API-Antwort enthielt kein erwartetes GeoJSON-Format (weder unter .geojson.nodeValue.features noch unter .geojson.features).");
+            console.warn("Flexzonen-API-Antwort enthielt kein erwartetes GeoJSON-Format.");
             allFlexzones = [];
         }
-        // --- KORRIGIERTE LOGIK ENDE ---
-
     } catch(e) {
         console.error("Fehler beim Laden der Flexzonen-Liste:", e);
         allFlexzones = [];
@@ -346,13 +327,34 @@ async function downloadZip() {
 
     const zip = new JSZip();
     // Verwende die neue Funktion zur Namensgenerierung
-    const baseFilename = generateFilename(selectedBrandDomain); // selectedBrandDomain ist dein cityAlias
+    const baseFilename = generateFilename(selectedBrandDomain);
     
+    // Stations-GeoJSON hinzufügen
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
 
     const flexzoneGeoJSON = flexzoneLayer.toGeoJSON();
+    
+    // Überprüfe, ob es Flexzonen-Features gibt
     if (flexzoneGeoJSON.features.length > 0) {
-        zip.file("flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
+        // Die komplette Flexzonen-Datei hinzufügen
+        zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
+
+        // Jedes Flexzonen-Feature als separate Datei hinzufügen
+        flexzoneGeoJSON.features.forEach(feature => {
+            const featureName = feature.properties.name;
+            // Erstelle einen gültigen Dateinamen: Buchstaben, Zahlen und Unterstriche
+            // Ersetze alles, was kein Wort-Zeichen, Zahl oder Unterstrich ist, durch einen Unterstrich.
+            const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_flexzone';
+            
+            // Erstelle ein GeoJSON FeatureCollection-Objekt nur für dieses eine Feature
+            const singleFeatureGeoJSON = {
+                type: "FeatureCollection",
+                features: [feature]
+            };
+
+            // Füge die Datei zum ZIP-Archiv hinzu
+            zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
+        });
     }
 
     const zipBlob = await zip.generateAsync({type:"blob"});
