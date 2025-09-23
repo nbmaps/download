@@ -141,7 +141,7 @@ async function loadLists(){
 
 async function loadAllFlexzones() {
     try {
-        const flexzoneResp = await fetch(`${corsProxy}https://api2.nextbike.net/api/v1.1/getFlexzones.json?api_key=zKeYbPSxKi4Xpf0c`);
+        const flexzoneResp = await fetch(`${corsProxy}https://api.nextbike.net/api/v1.1/getFlexzones.json?api_key=YxiJOFhh9s5X1YqZ`);
         if (!flexzoneResp.ok) {
             const errorText = await flexzoneResp.text();
             console.error(`Flexzonen-API HTTP Fehler: ${flexzoneResp.status} - ${errorText}`);
@@ -471,4 +471,5 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
 });
