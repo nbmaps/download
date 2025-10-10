@@ -2,10 +2,11 @@ const $ = sel => document.querySelector(sel);
 const corsProxy = 'https://corsproxy.io/?';
 
 let map, layer, currentGeoJSON = null;
-let flexzoneLayer;
+let flexzoneLayer, businessAreaLayer;
 let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
 let selectedBrandDomain = null;
-let allFlexzones = []; 
+let allFlexzones = [];
+let allBusinessAreas = [];
 
 const nextbikeIcon = L.icon({
     iconUrl: 'pic/marker/marker_nbblue.png',
@@ -64,13 +65,28 @@ function initMap(){
         }
     });
 
+    businessAreaLayer = L.geoJSON(null, {
+        style: function(feature) {
+            return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 };
+        },
+        onEachFeature: (f, l) => {
+            if(f.properties.name)  {
+                l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`);
+            }
+        }
+    });
+
     layer.addTo(map);
     if ($('#flexzonesCheckbox').checked) {
         flexzoneLayer.addTo(map);
     }
+    if ($('#businessAreasCheckbox') && $('#businessAreasCheckbox').checked) {
+        businessAreaLayer.addTo(map);
+    }
     
     overlays["Stationen"] = layer;
     overlays["Flexzonen"] = flexzoneLayer;
+    overlays["Business Areas"] = businessAreaLayer;
     
     L.control.layers(baseMaps, overlays).addTo(map);
     map.setView([51.1657, 10.4515], 6);
@@ -133,6 +149,7 @@ async function loadLists(){
         $('#load-status').textContent = 'Bitte Auswahl treffen.';
         
         loadAllFlexzones();
+        loadAllBusinessAreas();
     }catch(e){
         $('#load-status').textContent = 'Fehler beim Laden der System-Listen.';
         alert('Fehler beim Laden der System-Listen. Bitte prüfen Sie die Internetverbindung und laden Sie die Seite neu.');
@@ -159,6 +176,29 @@ async function loadAllFlexzones() {
     } catch(e) {
         console.error("Fehler beim Laden der Flexzonen-Liste:", e);
         allFlexzones = [];
+    }
+}
+
+async function loadAllBusinessAreas() {
+    try {
+        const businessAreaResp = await fetch(`${corsProxy}https://api.nextbike.net/api/v1.1/getFlexzones.json?api_key=YxiJOFhh9s5X1YqZ&categories=business_area`);
+        if (!businessAreaResp.ok) {
+            const errorText = await businessAreaResp.text();
+            console.error(`BusinessArea-API HTTP Fehler: ${businessAreaResp.status} - ${errorText}`);
+            throw new Error(`BusinessArea-API HTTP ${businessAreaResp.status}`);
+        }
+        const businessAreaData = await businessAreaResp.json();
+        if (businessAreaData.geojson && businessAreaData.geojson.nodeValue && businessAreaData.geojson.nodeValue.features) {
+            allBusinessAreas = businessAreaData.geojson.nodeValue.features;
+        } else if (businessAreaData.geojson && businessAreaData.geojson.features) {
+            allBusinessAreas = businessAreaData.geojson.features;
+        } else {
+            console.warn("BusinessArea-API-Antwort enthielt kein erwartetes GeoJSON-Format.");
+            allBusinessAreas = [];
+        }
+    } catch(e) {
+        console.error("Fehler beim Laden der BusinessArea-Liste:", e);
+        allBusinessAreas = [];
     }
 }
 
@@ -275,8 +315,20 @@ async function loadData(){
                 flexzoneLayer.addData(flexzoneGeoJSON);
             }
         }
+
+        businessAreaLayer.clearLayers();
+        if ($('#businessAreasCheckbox').checked && allBusinessAreas.length > 0 && selectedBrandDomain) {
+            const relevantBusinessAreas = allBusinessAreas.filter(f => f.properties?.domain === selectedBrandDomain);
+            if (relevantBusinessAreas.length > 0) {
+                const businessAreaGeoJSON = {
+                    type: "FeatureCollection",
+                    features: relevantBusinessAreas
+                };
+                businessAreaLayer.addData(businessAreaGeoJSON);
+            }
+        }
         
-        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers()]);
+        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers(), ...businessAreaLayer.getLayers()]);
         if (combinedLayer.getLayers().length > 0) {
             const bounds = combinedLayer.getBounds();
             if (bounds.isValid()) {
@@ -354,6 +406,20 @@ async function downloadZip() {
 
             // Füge die Datei zum ZIP-Archiv hinzu
             zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
+        });
+    }
+
+    const businessAreaGeoJSON = businessAreaLayer.toGeoJSON();
+    if (businessAreaGeoJSON.features.length > 0) {
+        zip.file("fullsystem_business_areas.geojson", JSON.stringify(businessAreaGeoJSON, null, 2));
+        businessAreaGeoJSON.features.forEach(feature => {
+            const featureName = feature.properties.name;
+            const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_business_area';
+            const singleFeatureGeoJSON = {
+                type: "FeatureCollection",
+                features: [feature]
+            };
+            zip.file(`businessarea_${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
         });
     }
 
@@ -468,6 +534,18 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
             if (map.hasLayer(flexzoneLayer)) {
                 map.removeLayer(flexzoneLayer);
+            }
+        }
+    });
+
+    $('#businessAreasCheckbox').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            if (!map.hasLayer(businessAreaLayer)) {
+                map.addLayer(businessAreaLayer);
+            }
+        } else {
+            if (map.hasLayer(businessAreaLayer)) {
+                map.removeLayer(businessAreaLayer);
             }
         }
     });
